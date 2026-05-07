@@ -42,7 +42,7 @@ const prompt = ref<string>('')
   // 是否正在加载
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
-  
+
 
 // 添加PromptStore
 const promptStore = usePromptStore()
@@ -139,7 +139,7 @@ async function onConversation() {
                 text: lastText + (data.text ?? ''),
                 inversion: false,
                 error: false,
-                loading: true, 
+                loading: true,
                 conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
                 requestOptions: { prompt: message, options: { ...options } },
               },
@@ -496,6 +496,7 @@ onUnmounted(() => {
             </template>
             <template v-else>
               <div>
+<!--对话列表，对应着对话区-->
                 <Message
                   v-for="(item, index) of dataSources"
                   :key="index"
