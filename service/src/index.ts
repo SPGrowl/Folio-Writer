@@ -12,6 +12,7 @@ const router = express.Router()
 app.use(express.static('public'))
 app.use(express.json())
 
+// 监视所有路径请求和方法，处理跨域
 app.all('*', (_, res, next) => {
   res.header('Access-Control-Allow-Origin', '*')
   res.header('Access-Control-Allow-Headers', 'authorization, Content-Type')
@@ -20,6 +21,7 @@ app.all('*', (_, res, next) => {
 })
 
 router.post('/chat-process', [auth, limiter], async (req, res) => {
+  // 声明响应体为任意二进制流，用于流式输出
   res.setHeader('Content-type', 'application/octet-stream')
 
   try {
@@ -29,6 +31,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
       message: prompt,
       lastContext: options,
       process: (chat: ChatMessage) => {
+        // 如果第一个分块，则发送完整的JSON对象，否则发送换行符和JSON对象
         res.write(firstChunk ? JSON.stringify(chat) : `\n${JSON.stringify(chat)}`)
         firstChunk = false
       },

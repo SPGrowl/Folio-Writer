@@ -25,6 +25,7 @@ function http<T = any>(
   const successHandler = (res: AxiosResponse<Response<T>>) => {
     const authStore = useAuthStore()
 
+    // 如果响应状态为成功，且响应数据位字符串，则直接返回响应数据
     if (res.data.status === 'Success' || typeof res.data === 'string')
       return res.data
 

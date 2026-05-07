@@ -31,14 +31,18 @@ const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
 const { scrollRef, scrollToBottom, scrollToBottomIfAtBottom } = useScroll()
 const { usingContext, toggleUsingContext } = useUsingContext()
 
+// 路由参数中解构uuid
 const { uuid } = route.params as { uuid: string }
 
+// 从store中获取本次聊天数据
 const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
 const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
-
+// 输入框内容
 const prompt = ref<string>('')
+  // 是否正在加载
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
+  
 
 // 添加PromptStore
 const promptStore = usePromptStore()
@@ -59,14 +63,16 @@ function handleSubmit() {
 async function onConversation() {
   let message = prompt.value
 
+  // 检测是否正在加载，TODO：建议加入提示信息：消息生成中，请稍后重试
   if (loading.value)
     return
-
+// TODO：建议加入提示信息：请输入内容
   if (!message || message.trim() === '')
     return
 
   controller = new AbortController()
 
+  // 插入用户气泡
   addChat(
     +uuid,
     {
@@ -75,6 +81,7 @@ async function onConversation() {
       inversion: true,
       error: false,
       conversationOptions: null,
+      // 记录本轮提示词，便于复用
       requestOptions: { prompt: message, options: null },
     },
   )
@@ -88,7 +95,7 @@ async function onConversation() {
 
   if (lastContext && usingContext.value)
     options = { ...lastContext }
-
+// 插入回复占位气泡
   addChat(
     +uuid,
     {
@@ -101,6 +108,7 @@ async function onConversation() {
       requestOptions: { prompt: message, options: { ...options } },
     },
   )
+  // 滚动到底部
   scrollToBottom()
 
   try {
@@ -112,28 +120,31 @@ async function onConversation() {
         signal: controller.signal,
         onDownloadProgress: ({ event }) => {
           const xhr = event.target
+          // 解析出响应文本
           const { responseText } = xhr
-          // Always process the final line
+          // Always process the final line，读取最后一个字符
           const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
           let chunk = responseText
+          // 若最后一个字符有效，把最后一个字符拼接到chunk中
           if (lastIndex !== -1)
             chunk = responseText.substring(lastIndex)
           try {
             const data = JSON.parse(chunk)
             updateChat(
               +uuid,
+              // 指定更新最后一条回复占位气泡
               dataSources.value.length - 1,
               {
                 dateTime: new Date().toLocaleString(),
                 text: lastText + (data.text ?? ''),
                 inversion: false,
                 error: false,
-                loading: true,
+                loading: true, 
                 conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
                 requestOptions: { prompt: message, options: { ...options } },
               },
             )
-
+// 处理长回复
             if (openLongReply && data.detail.choices[0].finish_reason === 'length') {
               options.parentMessageId = data.id
               lastText = data.text
@@ -148,14 +159,15 @@ async function onConversation() {
           }
         },
       })
+      // 单次请求结束
       updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
     }
-
+// 执行请求函数
     await fetchChatAPIOnce()
   }
   catch (error: any) {
     const errorMessage = error?.message ?? t('common.wrong')
-
+// 请求中止
     if (error.message === 'canceled') {
       updateChatSome(
         +uuid,
@@ -171,6 +183,7 @@ async function onConversation() {
     const currentChat = getChatByUuidAndIndex(+uuid, dataSources.value.length - 1)
 
     if (currentChat?.text && currentChat.text !== '') {
+      // 追加一行错误信息
       updateChatSome(
         +uuid,
         dataSources.value.length - 1,
@@ -182,7 +195,7 @@ async function onConversation() {
       )
       return
     }
-
+// 没有有效正文
     updateChat(
       +uuid,
       dataSources.value.length - 1,
@@ -382,6 +395,7 @@ function handleClear() {
   })
 }
 
+// 处理回车键事件
 function handleEnter(event: KeyboardEvent) {
   if (!isMobile.value) {
     if (event.key === 'Enter' && !event.shiftKey) {

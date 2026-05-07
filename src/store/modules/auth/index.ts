@@ -21,15 +21,20 @@ export const useAuthStore = defineStore('auth-store', {
 
   getters: {
     isChatGPTAPI(state): boolean {
+      // 判断传入的会话对象的特定字段是否为ChatGPTAPI
       return state.session?.model === 'ChatGPTAPI'
     },
   },
 
   actions: {
+    // 获取会话数据
     async getSession() {
       try {
+        // 从后端获取会话信息
         const { data } = await fetchSession<SessionResponse>()
+        // 将会话信息存入store
         this.session = { ...data }
+        // 等价于: return data,存入后返回data
         return Promise.resolve(data)
       }
       catch (error) {

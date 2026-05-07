@@ -30,11 +30,12 @@ export function fetchChatAPIProcess<T = any>(
   const settingStore = useSettingStore()
   const authStore = useAuthStore()
 
+  // 设置请求参数
   let data: Record<string, any> = {
     prompt: params.prompt,
     options: params.options,
   }
-
+// 如果使用ChatGPTAPI，则设置系统消息、温度、top_p
   if (authStore.isChatGPTAPI) {
     data = {
       ...data,
