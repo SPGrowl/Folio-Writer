@@ -7,9 +7,8 @@ import Footer from './Footer.vue'
 import { useAppStore, useChatStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { PromptStore, SvgIcon } from '@/components/common'
-import {useLiteStore} from "@/store/lite";
 import { t } from '@/locales'
-const liteStore = useLiteStore()
+
 const appStore = useAppStore()
 const chatStore = useChatStore()
 
@@ -99,8 +98,7 @@ watch(
         </div>
         <div class="flex items-center p-4 space-x-4">
           <div class="flex-1">
-<!-- 打开提示词商店按钮-->
-            <NButton block @click="show = true" v-if="liteStore.state">
+            <NButton block @click="show = true">
               {{ $t('store.siderButton') }}
             </NButton>
           </div>

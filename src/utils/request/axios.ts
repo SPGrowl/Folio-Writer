@@ -9,8 +9,8 @@ const service = axios.create({
 service.interceptors.request.use(
   (config) => {
     const token = useAuthStore().token
+    // 如果token存在，则设置请求头，挂上Bearer
     if (token)
-      // 设置请求头，挂上Bearer
       config.headers.Authorization = `Bearer ${token}`
     return config
   },

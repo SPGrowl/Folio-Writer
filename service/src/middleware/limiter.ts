@@ -1,6 +1,7 @@
 import { rateLimit } from 'express-rate-limit'
 import { isNotEmptyString } from '../utils/is'
 
+// 通过rateLimit限制每小时的最大请求次数
 const MAX_REQUEST_PER_HOUR = process.env.MAX_REQUEST_PER_HOUR
 
 const maxCount = (isNotEmptyString(MAX_REQUEST_PER_HOUR) && !isNaN(Number(MAX_REQUEST_PER_HOUR)))

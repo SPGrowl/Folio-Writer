@@ -25,8 +25,11 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
   res.setHeader('Content-type', 'application/octet-stream')
 
   try {
+    // TODO：req.body的实际数据结构是什么？为什么不是解构data部分？
     const { prompt, options = {}, systemMessage, temperature, top_p } = req.body as RequestProps
     let firstChunk = true
+
+    //调用chatReplyProcess函数，处理请求
     await chatReplyProcess({
       message: prompt,
       lastContext: options,

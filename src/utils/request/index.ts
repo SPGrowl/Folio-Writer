@@ -72,6 +72,7 @@ export function post<T = any>(
 ): Promise<Response<T>> {
   return http<T>({
     url,
+    // 指定发送post请求
     method,
     data,
     headers,

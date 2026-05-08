@@ -17,8 +17,11 @@ export function defaultSetting(): SettingsState {
 }
 
 export function getLocalState(): SettingsState {
-  const localSetting: SettingsState | undefined = ss.get(LOCAL_NAME)
-  return { ...defaultSetting(), ...localSetting }
+  const localSetting = ss.get(LOCAL_NAME) as (Partial<SettingsState> & { liteMode?: unknown }) | undefined
+  if (!localSetting)
+    return defaultSetting()
+  const { liteMode: _legacyLite, ...rest } = localSetting
+  return { ...defaultSetting(), ...rest }
 }
 
 export function setLocalState(setting: SettingsState): void {
