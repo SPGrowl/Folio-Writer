@@ -20,9 +20,12 @@ export const useAppStore = defineStore('app-store', {
       if (this.language !== language) {
         this.language = language
         this.recordState()
+				console.log(this.liteMode)
       }
     },
-
+    setLiteMode() {
+      this.recordState()
+    },
     recordState() {
       setLocalSetting(this.$state)
     },

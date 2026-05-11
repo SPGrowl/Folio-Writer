@@ -16,6 +16,7 @@ export const useUserStore = defineStore('user-store', {
     },
 
     recordState() {
+      // 将state中的数据存储到本体储存
       setLocalState(this.$state)
     },
   },

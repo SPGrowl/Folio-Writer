@@ -30,7 +30,9 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
     let firstChunk = true
 
     //调用chatReplyProcess函数，处理请求
-    await chatReplyProcess({
+    await chatReplyProcess(
+      // 以下为整个实参option
+      {
       message: prompt,
       lastContext: options,
       process: (chat: ChatMessage) => {

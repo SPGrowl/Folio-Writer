@@ -1,13 +1,16 @@
 interface StorageData<T = any> {
   data: T
+  // 时间戳或者null
   expire: number | null
 }
 
 export function createLocalStorage(options?: { expire?: number | null }) {
+  // 
   const DEFAULT_CACHE_TIME = 60 * 60 * 24 * 7
 
   const { expire } = Object.assign({ expire: DEFAULT_CACHE_TIME }, options)
 
+  // 根据传入的键名和数据，将数据存储到本地存储中
   function set<T = any>(key: string, data: T) {
     const storageData: StorageData<T> = {
       data,

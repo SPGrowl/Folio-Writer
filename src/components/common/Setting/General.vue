@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue'
-import { NButton, NInput, NPopconfirm, NSelect, useMessage } from 'naive-ui'
+import { NButton, NInput, NPopconfirm, NSelect, useMessage ,NSwitch} from 'naive-ui'
 import type { Language, Theme } from '@/store/modules/app/helper'
 import { SvgIcon } from '@/components/common'
 import { useAppStore, useUserStore } from '@/store'
@@ -52,6 +52,7 @@ const themeOptions: { label: string; key: Theme; icon: string }[] = [
     icon: 'ri:moon-foggy-line',
   },
 ]
+
 
 const languageOptions: { label: string; key: Language; value: Language }[] = [
   { label: 'English', key: 'en-US', value: 'en-US' },
@@ -122,6 +123,9 @@ function handleImportButtonClick(): void {
   if (fileInput)
     fileInput.click()
 }
+function handleLiteChange():void {
+
+}
 </script>
 
 <template>
@@ -189,7 +193,16 @@ function handleImportButtonClick(): void {
           </NPopconfirm>
         </div>
       </div>
+      <!-- 精简模式设置 -->
       <div class="flex items-center space-x-4">
+        <span class="flex-shrink-0 w-[100px]">{{ $t('setting.liteMode') }}</span>
+        <div class="flex flex-wrap items-center gap-4">
+          <NSwitch v-model:value="appStore.liteMode" @update:value="handleLiteChange" />
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <!-- 主题设置 -->
         <span class="flex-shrink-0 w-[100px]">{{ $t('setting.theme') }}</span>
         <div class="flex flex-wrap items-center gap-4">
           <template v-for="item of themeOptions" :key="item.key">

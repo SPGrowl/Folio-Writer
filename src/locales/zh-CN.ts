@@ -69,6 +69,7 @@ export default {
     chatHistory: '聊天记录',
     theme: '主题',
     language: '语言',
+    liteMode: '精简模式',
     api: 'API',
     reverseProxy: '反向代理',
     timeout: '超时',

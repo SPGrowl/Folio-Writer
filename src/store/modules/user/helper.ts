@@ -12,6 +12,7 @@ export interface UserState {
   userInfo: UserInfo
 }
 
+// 对应设置中的用户信息等字段
 export function defaultSetting(): UserState {
   return {
     userInfo: {
@@ -22,6 +23,7 @@ export function defaultSetting(): UserState {
   }
 }
 
+// 从本地存储中读取设置
 export function getLocalState(): UserState {
   const localSetting: UserState | undefined = ss.get(LOCAL_NAME)
   return { ...defaultSetting(), ...localSetting }

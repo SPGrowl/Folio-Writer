@@ -8,6 +8,7 @@ export interface SettingsState {
   top_p: number
 }
 
+// 对应高级设置
 export function defaultSetting(): SettingsState {
   return {
     systemMessage: 'You are ChatGPT, a large language model trained by OpenAI. Follow the user\'s instructions carefully. Respond using markdown.',

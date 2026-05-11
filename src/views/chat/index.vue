@@ -113,29 +113,36 @@ async function onConversation() {
 
   try {
     let lastText = ''
+    // 定义一个异步函数
     const fetchChatAPIOnce = async () => {
       await fetchChatAPIProcess<Chat.ConversationResponse>({
         prompt: message,
         options,
         signal: controller.signal,
+        // TODO:下载进度回调 ??
         onDownloadProgress: ({ event }) => {
           const xhr = event.target
-          // 解析出响应文本
+          // 解构出响应文本
           const { responseText } = xhr
-          // Always process the final line，读取最后一个字符
+          //读取最后一个字符
           const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
           let chunk = responseText
           // 若最后一个字符有效，把最后一个字符拼接到chunk中
           if (lastIndex !== -1)
             chunk = responseText.substring(lastIndex)
-          try {
+          
+            //?
+            try {
+              // 将chunk解析为实际的JS数据结构
             const data = JSON.parse(chunk)
+            // 更新回复气泡
             updateChat(
               +uuid,
               // 指定更新最后一条回复占位气泡
               dataSources.value.length - 1,
               {
                 dateTime: new Date().toLocaleString(),
+                // 实际的回复文本:
                 text: lastText + (data.text ?? ''),
                 inversion: false,
                 error: false,
@@ -144,6 +151,7 @@ async function onConversation() {
                 requestOptions: { prompt: message, options: { ...options } },
               },
             )
+
 // 处理长回复
             if (openLongReply && data.detail.choices[0].finish_reason === 'length') {
               options.parentMessageId = data.id
