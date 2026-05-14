@@ -27,6 +27,8 @@ export default {
     verify: '验证',
     unauthorizedTips: '未经授权，请先进行验证。',
     stopResponding: '停止响应',
+		liteOn:"精简模式:开",
+    liteOff:"精简模式:关"
   },
   chat: {
     newChatButton: '新建聊天',
@@ -54,6 +56,14 @@ export default {
     showRawText: '显示原文',
     thinking: '思考中...',
   },
+	tooltip:{
+		stop: '停止响应',
+	},
+	model:{
+		dsV4Flash:"DeepSeek-V4 快速模式",
+		dsv4Pro:"DeepSeek-V4 专家模式",
+		modelPlaceholder:"请选择模型",
+	},
   setting: {
     setting: '设置',
     general: '总览',

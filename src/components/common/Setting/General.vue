@@ -124,7 +124,14 @@ function handleImportButtonClick(): void {
     fileInput.click()
 }
 function handleLiteChange():void {
-
+   appStore.setLiteMode()
+	if (appStore.liteMode)
+	{
+    ms.success(t('common.liteOn'))
+	}
+	else {
+    ms.success(t('common.liteOff'))
+	}
 }
 </script>
 

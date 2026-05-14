@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { NAutoComplete, NButton, NInput, useDialog, useMessage } from 'naive-ui'
+import { NAutoComplete, NButton, NInput,NTooltip, useDialog, useMessage ,NSpace,NSelect} from 'naive-ui'
 import { toPng } from 'html-to-image'
 import { Message } from './components'
 import { useScroll } from './hooks/useScroll'
@@ -42,7 +42,7 @@ const prompt = ref<string>('')
   // 是否正在加载
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
-
+const modelValue=ref(null)
 
 // 添加PromptStore
 const promptStore = usePromptStore()
@@ -56,6 +56,20 @@ dataSources.value.forEach((item, index) => {
     updateChatSome(+uuid, index, { loading: false })
 })
 
+interface model {
+	label:string
+	value:string
+}
+const modelList:model[] = [
+  {
+    label: t('model.dsV4Flash'),
+    value: 'deepseek-v4-flash',
+  },
+  {
+    label: t('model.dsv4Pro'),
+    value: 'deepseek-v4-pro',
+  },
+]
 function handleSubmit() {
   onConversation()
 }
@@ -130,7 +144,7 @@ async function onConversation() {
           // 若最后一个字符有效，把最后一个字符拼接到chunk中
           if (lastIndex !== -1)
             chunk = responseText.substring(lastIndex)
-          
+
             //?
             try {
               // 将chunk解析为实际的JS数据结构
@@ -516,14 +530,15 @@ onUnmounted(() => {
                   @regenerate="onRegenerate(index)"
                   @delete="handleDelete(index)"
                 />
-                <div class="sticky bottom-0 left-0 flex justify-center">
-                  <NButton v-if="loading" type="warning" @click="handleStop">
-                    <template #icon>
-                      <SvgIcon icon="ri:stop-circle-line" />
-                    </template>
-                    {{ t('common.stopResponding') }}
-                  </NButton>
-                </div>
+<!--								已被合并到发送按钮中-->
+<!--                <div class="sticky bottom-0 left-0 flex justify-center">-->
+<!--                  <NButton v-if="loading" type="warning" @click="handleStop">-->
+<!--                    <template #icon>-->
+<!--                      <SvgIcon icon="ri:stop-circle-line" />-->
+<!--                    </template>-->
+<!--                    {{ t('common.stopResponding') }}-->
+<!--                  </NButton>-->
+<!--                </div>-->
               </div>
             </template>
           </div>
@@ -543,12 +558,14 @@ onUnmounted(() => {
               <SvgIcon icon="ri:download-2-line" />
             </span>
           </HoverButton>
+<!--					是否使用对话上下文-->
           <HoverButton @click="toggleUsingContext">
             <span class="text-xl" :class="{ 'text-[#4b9e5f]': usingContext, 'text-[#a8071a]': !usingContext }">
               <SvgIcon icon="ri:chat-history-line" />
             </span>
           </HoverButton>
-          <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption">
+						<n-select v-model:value="modelValue" :options="modelList" size="small" style="width: 250px" :placeholder="t('model.modelPlaceholder')" />
+          <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption" >
             <template #default="{ handleInput, handleBlur, handleFocus }">
               <NInput
                 ref="inputRef"
@@ -563,13 +580,30 @@ onUnmounted(() => {
               />
             </template>
           </NAutoComplete>
-          <NButton type="primary" :disabled="buttonDisabled" @click="handleSubmit">
-            <template #icon>
+          <NButton type="primary" :disabled="buttonDisabled" @click="handleSubmit" v-if="!loading">
+            <template #icon >
               <span class="dark:text-black">
                 <SvgIcon icon="ri:send-plane-fill" />
               </span>
             </template>
           </NButton>
+
+					<template v-else>
+						<n-tooltip trigger="hover"><template #trigger>
+						<NButton type="primary" :disabled="!buttonDisabled" @click="handleStop"  >
+							<template #icon>
+              <span class="dark:text-black">
+<!--								使用iconfy库-->
+                <SvgIcon icon="famicons:stop-circle" />
+              </span>
+							</template>
+						</NButton>
+					</template>
+							{{t('tooltip.stop')}}
+						</n-tooltip>
+					</template>
+
+
         </div>
       </div>
     </footer>
