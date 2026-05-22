@@ -6,19 +6,21 @@ export interface SettingsState {
   systemMessage: string
   temperature: number
   top_p: number
+	modelName: string
 }
 
 // 对应高级设置
 export function defaultSetting(): SettingsState {
   return {
-    systemMessage: 'You are ChatGPT, a large language model trained by OpenAI. Follow the user\'s instructions carefully. Respond using markdown.',
+    systemMessage: 'You are a helpful LLM assistant.',
     temperature: 0.8,
     top_p: 1,
+		modelName: 'deepseek-v4-pro'
   }
 }
 
 export function getLocalState(): SettingsState {
-  const localSetting = ss.get(LOCAL_NAME) as (Partial<SettingsState> & { liteMode?: unknown }) | undefined
+  const localSetting = ss.get(LOCAL_NAME)
   if (!localSetting)
     return defaultSetting()
   const { liteMode: _legacyLite, ...rest } = localSetting

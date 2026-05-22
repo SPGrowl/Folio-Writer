@@ -50,6 +50,7 @@ export function fetchChatAPIProcess<T = any>(
       systemMessage: settingStore.systemMessage,
       temperature: settingStore.temperature,
       top_p: settingStore.top_p,
+			model:settingStore.modelName
     }
   }
 // 返回一个指向/chat-process的POSt请求交给后端路由进行后续工作

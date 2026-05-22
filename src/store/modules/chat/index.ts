@@ -6,6 +6,15 @@ import { t } from '@/locales'
 export const useChatStore = defineStore('chat-store', {
   state: (): Chat.ChatState => getLocalState(),
 
+	// export interface Chat.ChatState {
+	//     active: number | null
+	//     usingContext: boolean
+	//     history: History[]
+	//     chat: {
+	//         uuid: number
+	//         data: Chat[]
+	//     }[]
+	// }
   getters: {
     getChatHistoryByCurrentActive(state: Chat.ChatState) {
       const index = state.history.findIndex(item => item.uuid === state.active)

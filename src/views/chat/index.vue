@@ -3,7 +3,17 @@ import type { Ref } from 'vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { NAutoComplete, NButton, NInput,NTooltip, useDialog, useMessage ,NSpace,NSelect} from 'naive-ui'
+import {
+	NAutoComplete,
+	NButton,
+	NInput,
+	NTooltip,
+	useDialog,
+	useMessage,
+	NDropdown,
+	DropdownOption
+} from 'naive-ui'
+import {useSettingStore} from "@/store";
 import { toPng } from 'html-to-image'
 import { Message } from './components'
 import { useScroll } from './hooks/useScroll'
@@ -15,7 +25,8 @@ import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { useChatStore, usePromptStore } from '@/store'
 import { fetchChatAPIProcess } from '@/api'
 import { t } from '@/locales'
-
+import { useIconRender } from '@/hooks/useIconRender'
+const { iconRender } = useIconRender()
 let controller = new AbortController()
 
 const openLongReply = import.meta.env.VITE_GLOB_OPEN_LONG_REPLY === 'true'
@@ -42,11 +53,10 @@ const prompt = ref<string>('')
   // 是否正在加载
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
-const modelValue=ref(null)
-
 // 添加PromptStore
 const promptStore = usePromptStore()
 
+const settingStore = useSettingStore()
 // 使用storeToRefs，保证store修改后，联想部分能够重新渲染
 const { promptList: promptTemplate } = storeToRefs<any>(promptStore)
 
@@ -56,19 +66,17 @@ dataSources.value.forEach((item, index) => {
     updateChatSome(+uuid, index, { loading: false })
 })
 
-interface model {
-	label:string
-	value:string
-}
-const modelList:model[] = [
+const modelList:DropdownOption[] = [
   {
     label: t('model.dsV4Flash'),
-    value: 'deepseek-v4-flash',
+    key: 'deepseek-v4-flash',
+		icon: iconRender({ icon: 'logos:deepseek-icon' }),
   },
-  {
-    label: t('model.dsv4Pro'),
-    value: 'deepseek-v4-pro',
-  },
+	{
+		label: t('model.dsv4Pro'),
+		key: 'deepseek-v4-pro',
+		icon: iconRender({icon: 'logos:deepseek-icon'}),
+	}
 ]
 function handleSubmit() {
   onConversation()
@@ -439,7 +447,11 @@ function handleStop() {
     loading.value = false
   }
 }
+function handleModelName(key: string) {
+	settingStore.updateSetting({ modelName:key })
+	ms.success(`${t('model.modelAlert')}${settingStore.modelName}`)
 
+}
 // 可优化部分
 // 搜索选项计算，这里使用value作为索引项，所以当出现重复value时渲染异常(多项同时出现选中效果)
 // 理想状态下其实应该是key作为索引项,但官方的renderOption会出现问题，所以就需要value反renderLabel实现
@@ -512,8 +524,10 @@ onUnmounted(() => {
           <div id="image-wrapper" class="relative">
             <template v-if="!dataSources.length">
               <div class="flex items-center justify-center mt-4 text-center text-neutral-300">
-                <SvgIcon icon="ri:bubble-chart-fill" class="mr-2 text-3xl" />
-                <span>{{ t('chat.newChatTitle') }}</span>
+<!--                <SvgIcon icon="ri:bubble-chart-fill" class="mr-2 text-3xl" />-->
+<!--                <span>{{ t('chat.newChatTitle') }}</span>-->
+								<SvgIcon icon="si:ai-chat-line" class="mr-2 text-3xl" />
+								<span>{{ t('common.welcome') }}</span>
               </div>
             </template>
             <template v-else>
@@ -561,10 +575,27 @@ onUnmounted(() => {
 <!--					是否使用对话上下文-->
           <HoverButton @click="toggleUsingContext">
             <span class="text-xl" :class="{ 'text-[#4b9e5f]': usingContext, 'text-[#a8071a]': !usingContext }">
+
               <SvgIcon icon="ri:chat-history-line" />
             </span>
           </HoverButton>
-						<n-select v-model:value="modelValue" :options="modelList" size="small" style="width: 250px" :placeholder="t('model.modelPlaceholder')" />
+					<n-dropdown
+						trigger="hover"
+						placement="top-start"
+						:show-arrow="true"
+						:options="modelList"
+						@select="handleModelName"
+						:value="settingStore.modelName"
+
+					>
+<!--						模型选择-->
+						<HoverButton >
+            <span class="text-xl text-[#4f555e] dark:text-white">
+							<SvgIcon icon="carbon:model-alt"></SvgIcon>
+            </span>
+						</HoverButton>
+					</n-dropdown>
+
           <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption" >
             <template #default="{ handleInput, handleBlur, handleFocus }">
               <NInput
@@ -583,7 +614,7 @@ onUnmounted(() => {
           <NButton type="primary" :disabled="buttonDisabled" @click="handleSubmit" v-if="!loading">
             <template #icon >
               <span class="dark:text-black">
-                <SvgIcon icon="ri:send-plane-fill" />
+                <SvgIcon  icon="ri:send-plane-fill" />
               </span>
             </template>
           </NButton>
