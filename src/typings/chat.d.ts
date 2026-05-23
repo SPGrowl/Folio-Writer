@@ -11,6 +11,7 @@ declare namespace Chat {
 		requestOptions: { prompt: string; options?: ConversationRequest | null }
 	}
 
+
 	// 会话元数据
 	interface History {
 		title: string
@@ -24,6 +25,44 @@ declare namespace Chat {
 		history: History[]
 		//{ uuid: number; data: Chat[] }：单个会话的对话数组，包装一层data和uuid
 		chat: { uuid: number; data: Chat[] }[]
+	}
+
+	// 气泡数据
+	interface Bubble{
+		dateTime?: string
+		text: string
+		inversion?: boolean
+		error?: boolean
+		loading?: boolean
+	}
+
+
+	// 单轮对话
+	interface ChatTurn{
+          count:number
+          dateTime?:string
+          user:{
+			role:"user"
+		  }&Bubble
+          assistant:{
+			role:"assistant"
+			reasoning_content?:string
+		  }&Bubble
+	}
+
+	// 新版会话数组
+
+	interface Session{
+		title:string
+		uuid:number
+		context:ChatTurn[]
+		isEdit:boolean
+		createTime?:string
+	}
+	// state
+	interface SessionState {
+		sessions: Session[]
+		activeUuid: number | null
 	}
 // TODO：建议停用，对齐OpenAI格式
 	interface ConversationRequest {
