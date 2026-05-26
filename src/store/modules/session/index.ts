@@ -41,16 +41,34 @@ export const useSessionStore = defineStore('session-store', {
       setLocalState(this.$state)
     },
 
+
     /** 新建会话（对应原版 addHistory） */
     // TODO：禁止无限新建空会话，或者必须有Promt才能建立会话
-    addSession(session?: Partial<Chat.Session>, context: Chat.ChatTurn[] = []) {
-      const uuid = session?.uuid ?? Date.now()
+    createSeession(prompt:string) {
+      const uuid = Date.now()
+      const context:Chat.ChatTurn[]=[{
+        count:0,
+        user:{
+          role:'user',
+          text:prompt,
+          inversion:true,
+          dateTime:new Date().toISOString(),
+        },
+        assistant:{
+          role:'assistant',
+          text:null,
+          dateTime:new Date().toISOString(),
+          inversion:false,
+        // 思考中
+          loading:true,
+        },
+      }]
       const newSession: Chat.Session = {
         uuid,
-        title: session?.title ?? t('chat.newChatTitle'),
-        isEdit: session?.isEdit ?? false,
+        title: t('chat.newChatTitle'),
+        isEdit:false,
         context,
-        createTime: session?.createTime ?? new Date().toISOString(),
+        createTime:new Date().toISOString(),
       }
       this.sessions.unshift(newSession)
       this.activeUuid = uuid

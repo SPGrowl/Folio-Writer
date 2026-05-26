@@ -66,6 +66,11 @@ export default {
 		modelPlaceholder:"请选择模型",
 		modelAlert:"当前模型:"
 	},
+	bubble:{
+		cancel: '取消',
+		send: '发送',
+	},
+
   setting: {
     setting: '设置',
     general: '总览',

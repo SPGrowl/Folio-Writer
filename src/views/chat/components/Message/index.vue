@@ -1,10 +1,9 @@
 <script setup lang='ts'>
-import { computed, ref } from 'vue'
-import { NDropdown, useMessage } from 'naive-ui'
+import { ref } from 'vue'
+import { NButton, NInput, useMessage } from 'naive-ui'
 import AvatarComponent from './Avatar.vue'
 import TextComponent from './Text.vue'
 import { SvgIcon } from '@/components/common'
-import { useIconRender } from '@/hooks/useIconRender'
 import { t } from '@/locales'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { copyToClip } from '@/utils/copy'
@@ -15,7 +14,7 @@ interface Props {
   inversion?: boolean
   error?: boolean
   loading?: boolean
-	count?:number
+  count?: number
 }
 
 interface Emit {
@@ -29,68 +28,12 @@ const emit = defineEmits<Emit>()
 
 const { isMobile } = useBasicLayout()
 
-const { iconRender } = useIconRender()
-
 const message = useMessage()
-
-const textRef = ref<HTMLElement>()
-
 
 const asRawText = ref(props.inversion)
 const editDraft = ref<string>('')
-const messageRef = ref<HTMLElement>()
 const isEditing = ref<boolean>(false)
 const showActions = ref<boolean>(false)
-const options = computed(() => {
-  const common = [
-    {
-      label: t('chat.copy'),
-      key: 'copyText',
-      icon: iconRender({ icon: 'ri:file-copy-2-line' }),
-    },
-    // {
-    //   label: t('common.delete'),
-    //   key: 'delete',
-    //   icon: iconRender({ icon: 'ri:delete-bin-line' }),
-    // },
-
-  ]
-if (props.inversion) {
-  common.unshift({
-    label: t('common.edit'),  // 已有文案「编辑」
-    key: 'edit',
-    icon: iconRender({ icon: 'mingcute:edit-line' }),
-  })
-}
-  if (!props.inversion) {
-    common.unshift({
-      label: asRawText.value ? t('chat.preview') : t('chat.showRawText'),
-      key: 'toggleRenderType',
-      icon: iconRender({ icon: asRawText.value ? 'ic:outline-code-off' : 'ic:outline-code' }),
-    })
-  }
-
-  return common
-})
-
-
-function handleSelect(key: 'copyText' | 'delete' | 'toggleRenderType') {
-  switch (key) {
-    case 'copyText':
-      handleCopy()
-      return
-    case 'toggleRenderType':
-      asRawText.value = !asRawText.value
-      return
-    case 'delete':
-      emit('delete')
-  }
-}
-
-function handleRegenerate() {
-  messageRef.value?.scrollIntoView()
-  emit('regenerate')
-}
 
 async function handleCopy() {
   try {
@@ -101,15 +44,18 @@ async function handleCopy() {
     message.error(t('chat.copyFailed'))
   }
 }
-function updatePrompt(){
+
+function updatePrompt() {
   editDraft.value = props.text as string
   isEditing.value = true
 }
-function handleCancelEdit(){
+
+function handleCancelEdit() {
   isEditing.value = false
   editDraft.value = ''
 }
-function handleSubmitEdit(){
+
+function handleSubmitEdit() {
   isEditing.value = false
   editDraft.value = ''
   // TODO:将本次编辑的Promt发送，并更新会话
@@ -118,7 +64,6 @@ function handleSubmitEdit(){
 
 <template>
   <div
-    ref="messageRef"
     class="flex w-full mb-6 overflow-hidden"
     :class="[{ 'flex-row-reverse': inversion }]"
   >
@@ -128,8 +73,7 @@ function handleSubmitEdit(){
     >
       <AvatarComponent :image="inversion" />
     </div>
-    <div class="overflow-hidden text-sm " :class="[inversion ? 'items-end' : 'items-start']">
-      <!-- 对话时间 -->
+    <div class="overflow-hidden text-sm" :class="[inversion ? 'items-end' : 'items-start']">
       <p class="text-xs text-[#b4bbc4]" :class="[inversion ? 'text-right' : 'text-left']">
         {{ dateTime }}
       </p>
@@ -137,85 +81,88 @@ function handleSubmitEdit(){
         class="flex items-end gap-1 mt-2"
         :class="[inversion ? 'flex-row-reverse' : 'flex-row']"
       >
-<div
-  class="relative mt-2"
-  :class="[inversion ? 'flex flex-col items-end' : 'flex flex-col items-start']"
->
-  <!-- 仅用户消息需要悬停条；助手可另做一套或保留 regenerate -->
-  <div
-    class="group/bubble relative max-w-full"
-    @mouseenter="showActions = true"
-    @mouseleave="showActions = false"
-  >
-    <!-- 编辑态 NInput + 取消/发送 -->
-       <TextComponent
-          ref="textRef"
-          :inversion="inversion"
-          :error="error"
-          :text="text"
-          :loading="loading"
-          :as-raw-text="asRawText"
-          v-if="!isEditing"
-        />
-        <!-- 编辑态 -->
-        <div v-else>
+        <div
+          class="relative max-w-full"
+          :class="[inversion ? 'flex flex-col items-end' : 'flex flex-col items-start']"
+          @mouseenter="showActions = true"
+          @mouseleave="showActions = false"
+        >
+          <TextComponent
+            v-if="!isEditing"
+            :inversion="inversion"
+            :error="error"
+            :text="text"
+            :loading="loading"
+            :as-raw-text="asRawText"
+          />
+
           <NInput
-         v-model:value="editDraft"
-        type="textarea"
-         :autosize="{ minRows: 2, maxRows: 8 }"/>
-        <!-- 取消/发送 -->
-        <div class="flex gap-2 mt-2 justify-end">
-          <NButton size="small" @click="handleCancelEdit">
-            {{ t('common.no') }}  <!-- 或 locales 里加 cancel -->
-          </NButton>
-          <NButton size="small" type="primary" :disabled="!editDraft.trim()" @click="handleSubmitEdit">
-            {{ t('common.confirm') }} <!-- 或「发送」文案 -->
-          </NButton>
-        </div>
-        </div>
+            v-else
+            v-model:value="editDraft"
+            class="message-edit-input w-full min-w-[20px]"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 8 }"
+          >
+            <template #suffix>
+              <div class="message-edit-actions flex items-center gap-2">
+                <NButton size="tiny" quaternary @click="handleCancelEdit">
+                  {{ t('bubble.cancel') }}
+                </NButton>
+                <NButton
+                  size="tiny"
+                  type="primary"
+                  :disabled="!editDraft.trim()"
+                  @click="handleSubmitEdit"
+                >
+                  {{ t('bubble.send') }}
+                </NButton>
+              </div>
+            </template>
+          </NInput>
+
+          <!-- 操作栏：气泡下方、右侧，固定高度占位 -->
           <div
-            v-if="inversion && !isEditing&&showActions"
-            class="flex items-center gap-1 mt-1 h-6 transition-opacity duration-150"
-            :class="[
-              inversion ? 'justify-end' : 'justify-start',
-              isMobile ? 'opacity-100' : 'opacity-0 group-hover/bubble:opacity-100',
-            ]"
+            v-if="inversion && !isEditing"
+            class="message-actions flex h-6 min-h-6 w-full shrink-0 items-center justify-end"
           >
-            <button :title="t('common.edit')" @click="updatePrompt">
-              <SvgIcon icon="mingcute:edit-line" />
-            </button>
-            <button :title="t('chat.copy')" @click="handleCopy">
-              <SvgIcon icon="ri:file-copy-2-line" />
-            </button>
-            <!-- 需要再加删除等，继续横排即可 -->
-          </div>  
-  </div>
-  </div>
-
-  <!-- 操作栏：气泡外、下方、右侧 -->
-
-</div>
-      
-        <!-- <div class="flex flex-col">
-          <button
-            v-if="!inversion"
-            class="mb-2 transition text-neutral-300 hover:text-neutral-800 dark:hover:text-neutral-300"
-            @click="handleRegenerate"
-          >
-            <SvgIcon icon="ri:restart-line" />
-          </button>
-          <NDropdown
-            :trigger="isMobile ? 'click' : 'hover'"
-            :placement="!inversion ? 'right' : 'left'"
-            :options="options"
-            @select="handleSelect"
-          >
-            <button class="transition text-neutral-300 hover:text-neutral-800 dark:hover:text-neutral-200">
-              <SvgIcon icon="ri:more-2-fill" />
-            </button>
-          </NDropdown>
-        </div> -->
-        
+            <div
+              class="flex items-center gap-0.5 transition-opacity duration-150"
+              :class="[
+                isMobile || showActions ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              ]"
+            >
+              <button
+                type="button"
+                class="p-1 transition text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                :title="t('common.edit')"
+                @click="updatePrompt"
+              >
+                <SvgIcon icon="ri:edit-line" class="text-base" />
+              </button>
+              <button
+                type="button"
+                class="p-1 transition text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                :title="t('chat.copy')"
+                @click="handleCopy"
+              >
+                <SvgIcon icon="ri:file-copy-2-line" class="text-base" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
 </template>
+
+<style scoped>
+.message-edit-input :deep(.n-input-wrapper) {
+  align-items: flex-end;
+}
+
+.message-edit-input :deep(.n-input__suffix) {
+  align-self: flex-end;
+  line-height: 1;
+  padding-bottom: 6px;
+}
+</style>
