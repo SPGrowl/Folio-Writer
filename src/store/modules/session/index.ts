@@ -43,8 +43,8 @@ export const useSessionStore = defineStore('session-store', {
 
 
     /** 新建会话（对应原版 addHistory） */
-    // TODO：禁止无限新建空会话，或者必须有Promt才能建立会话
-    createSeession(prompt:string) {
+    // TODO：禁止无限新建空会话，或者必须有Prompt才能建立会话
+    createSession(prompt:string) {
       const uuid = Date.now()
       const context:Chat.ChatTurn[]=[{
         count:0,

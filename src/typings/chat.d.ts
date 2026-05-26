@@ -30,24 +30,25 @@ declare namespace Chat {
 	// 气泡数据
 	interface Bubble{
 		dateTime?: string
-		text: string
+		text: string | null
 		inversion?: boolean
 		error?: boolean
 		loading?: boolean
 	}
-
+   interface UserBubble extends Bubble{
+	   role:"user"
+   }
+   interface AssistantBubble extends Bubble{
+	   role:"assistant"
+	   reasoning_content?:string
+   }
 
 	// 单轮对话
 	interface ChatTurn{
           count:number
           dateTime?:string
-          user:{
-			role:"user"
-		  }&Bubble
-          assistant:{
-			role:"assistant"
-			reasoning_content?:string
-		  }&Bubble
+          user:UserBubble
+          assistant:AssistantBubble
 	}
 
 	// 新版会话数组
