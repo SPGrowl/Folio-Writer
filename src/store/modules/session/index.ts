@@ -40,257 +40,137 @@ export const useSessionStore = defineStore('session-store', {
     recordState() {
       setLocalState(this.$state)
     },
-
+    isEmptySession(s: Chat.Session) {
+      return s.context.length === 0
+    },
 
     /** 新建会话（对应原版 addHistory） */
     // TODO：禁止无限新建空会话，或者必须有Prompt才能建立会话
-    createSession(prompt:string) {
+   createSession(prompt:string) {
+    // TODO：UI层应该检查Prompt是否为空，禁止发送空消息
+    //清除占位消息
+    this.sessions = this.sessions.filter(s => !this.isEmptySession(s))
       const uuid = Date.now()
       const context:Chat.ChatTurn[]=[{
-        count:0,
+        turnIndex:0,
         user:{
           role:'user',
           text:prompt,
-          inversion:true,
           dateTime:new Date().toISOString(),
         },
         assistant:{
           role:'assistant',
           text:null,
+          //TODO:存疑，可能依赖响应结束的时间
           dateTime:new Date().toISOString(),
-          inversion:false,
         // 思考中
-          loading:true,
         },
       }]
+
       const newSession: Chat.Session = {
         uuid,
         title: t('chat.newChatTitle'),
-        isEdit:false,
         context,
         createTime:new Date().toISOString(),
       }
       this.sessions.unshift(newSession)
       this.activeUuid = uuid
-      this.reloadRoute(uuid)
+      this.recordState()
+      // this.reloadRoute(uuid)
     },
 
-    /** 更新会话元信息（对应原版 updateHistory） */
-    updateSession(uuid: number, edit: Partial<Chat.Session>) {
-      const index = findSessionIndex(this.sessions, uuid)
-      if (index !== -1) {
-        this.sessions[index] = { ...this.sessions[index], ...edit }
-        this.recordState()
-      }
-    },
-
-    /** 按侧边栏下标删除会话（对应原版 deleteHistory） */
-    async deleteSession(index: number) {
-      this.sessions.splice(index, 1)
-
-      if (this.sessions.length === 0) {
-        this.activeUuid = null
-        this.reloadRoute()
-        return
-      }
-
-      if (index > 0 && index <= this.sessions.length) {
-        const uuid = this.sessions[index - 1].uuid
-        this.activeUuid = uuid
-        this.reloadRoute(uuid)
-        return
-      }
-
-      if (index === 0) {
-        if (this.sessions.length > 0) {
-          const uuid = this.sessions[0].uuid
-          this.activeUuid = uuid
-          this.reloadRoute(uuid)
-        }
-      }
-
-      if (index > this.sessions.length) {
-        const uuid = this.sessions[this.sessions.length - 1].uuid
-        this.activeUuid = uuid
-        this.reloadRoute(uuid)
-      }
-    },
-
+		//TODO:发出Prompt（应该放在API层或者UI层）
+    
     /** 切换当前会话（对应原版 setActive） */
     async setActive(uuid: number) {
       this.activeUuid = uuid
       return await this.reloadRoute(uuid)
     },
 
-    getTurnByUuidAndIndex(uuid: number, index: number) {
-      if (!uuid || uuid === 0) {
-        if (this.sessions.length)
-          return this.sessions[0].context[index] ?? null
-        return null
-      }
+    getPrompt(uuid: number,turnIndex: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if (sessionIndex !== -1)
-        return this.sessions[sessionIndex].context[index] ?? null
+      if(sessionIndex === -1)
+        {return}
+      const turn = this.sessions[sessionIndex].context.find(item => item.turnIndex === turnIndex)
+      if(turn)
+        {return turn.user.text}
       return null
     },
 
-    /**
-     * 追加一轮对话（对应原版 addChatByUuid）
-     * 首条 user 消息会自动更新默认标题
-     */
-    addTurn(uuid: number, turn: Chat.ChatTurn) {
-      const titleFromUser = turn.user.text?.trim()
-
-      if (!uuid || uuid === 0) {
-        if (this.sessions.length === 0) {
-          const newUuid = Date.now()
-          this.sessions.push({
-            uuid: newUuid,
-            title: titleFromUser || t('chat.newChatTitle'),
-            isEdit: false,
-            context: [turn],
-            createTime: new Date().toISOString(),
-          })
-          this.activeUuid = newUuid
-          this.recordState()
-        }
-        else {
-          this.sessions[0].context.push(turn)
-          if (this.sessions[0].title === t('chat.newChatTitle') && titleFromUser)
-            this.sessions[0].title = titleFromUser
-          this.recordState()
-        }
-        return
+    // 重试或更改prompt，绑定在重试按钮或消息的输入框里
+    retryTurn(uuid: number,turnIndex: number, text?: string) {
+      const sessionIndex = findSessionIndex(this.sessions, uuid)
+      let currentPrompt:string|null=null
+      if(sessionIndex === -1)
+        {return}
+      const currentSession=this.sessions[sessionIndex]
+      if(text!==null&&text!==undefined&&text.trim()!=='') {
+        currentPrompt= text
       }
+      else{
+        currentPrompt= this.getPrompt(uuid,turnIndex) as string
+      }
+      if(turnIndex>currentSession.context.length-1||turnIndex<0) {return}
+      const currentTurn=currentSession.context[turnIndex]
+      currentTurn.user.text=currentPrompt
+      currentTurn.assistant.text=null
+      // 从此处截断上下文
+      this.sliceContext(uuid,turnIndex)
+    },     
+    addTurn(uuid: number, text: string) {
+      const sessionIndex = findSessionIndex(this.sessions, uuid)
+      if(sessionIndex === -1)
+        {return}
+      const currentSession=this.sessions[sessionIndex]
+      const newTurn:Chat.ChatTurn={
+        turnIndex:currentSession.context.length,
+        user:{role:'user',text:text,dateTime:new Date().toISOString()},
+        assistant:{role:'assistant',text:null,dateTime:new Date().toISOString()},
+      }
+      currentSession.context.push(newTurn)
+      this.recordState()
+      //TODO：返回组装好的请求体？
+    },
 
+    // TODO：待设计：减少类型断言
+    composeRequest(uuid: number,turnIndex: number) {
+      const sessionIndex = findSessionIndex(this.sessions, uuid)
+      if(sessionIndex === -1)
+        {return}
+      const currentSession=this.sessions[sessionIndex]
+
+      // TODO：插入一条系统提示词
+      const request=[{role:'system',content:"You are a helpful LLM assistant."}]
+      for(let i=0;i<=turnIndex;i++) {
+        if(i<turnIndex) {
+      const {user,assistant}=currentSession.context[i]
+      request.push({role:user.role,content:user.text as string })
+      request.push({role:assistant.role,content:assistant.text as string })
+      }
+      else{
+        const {user}=currentSession.context[i]
+        request.push({role:user.role,content:user.text as string })
+      }
+      }
+      return request    
+    },
+    sliceContext(uuid: number, turnIndex: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
       if (sessionIndex !== -1) {
-        this.sessions[sessionIndex].context.push(turn)
-        if (this.sessions[sessionIndex].title === t('chat.newChatTitle') && titleFromUser)
-          this.sessions[sessionIndex].title = titleFromUser
+        this.sessions[sessionIndex].context = this.sessions[sessionIndex].context.slice(0, turnIndex+1)
         this.recordState()
       }
     },
-
-    /** 整轮替换（对应原版 updateChatByUuid） */
-    updateTurn(uuid: number, index: number, turn: Chat.ChatTurn) {
-      if (!uuid || uuid === 0) {
-        if (this.sessions.length) {
-          this.sessions[0].context[index] = turn
-          this.recordState()
-        }
-        return
-      }
-
+    deleteSession(uuid: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if (sessionIndex !== -1) {
-        this.sessions[sessionIndex].context[index] = turn
-        this.recordState()
+      if(sessionIndex === -1)
+        {return}
+      this.sessions.splice(sessionIndex,1)
+      if(this.activeUuid === uuid&&sessionIndex>0) {
+        this.activeUuid =this.sessions[sessionIndex-1].uuid
       }
+      this.recordState()
     },
-
-    /** 整轮局部更新（对应原版 updateChatSomeByUuid） */
-    updateTurnSome(uuid: number, index: number, patch: Partial<Chat.ChatTurn>) {
-      if (!uuid || uuid === 0) {
-        if (this.sessions.length) {
-          const current = this.sessions[0].context[index]
-          if (current)
-            this.sessions[0].context[index] = mergeTurn(current, patch)
-          this.recordState()
-        }
-        return
-      }
-
-      const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if (sessionIndex !== -1) {
-        const current = this.sessions[sessionIndex].context[index]
-        if (current)
-          this.sessions[sessionIndex].context[index] = mergeTurn(current, patch)
-        this.recordState()
-      }
-    },
-
-    /** 按轮次 count 更新 user 气泡文案（输入框草稿等场景） */
-    updatePrompt(uuid: number, count: number, text: string) {
-      const sessionIndex = !uuid || uuid === 0
-        ? (this.sessions.length ? 0 : -1)
-        : findSessionIndex(this.sessions, uuid)
-
-      if (sessionIndex === -1)
-        return
-
-      const turn = this.sessions[sessionIndex].context.find(item => item.count === count)
-      if (turn) {
-        turn.user.text = text
-        this.recordState()
-      }
-    },
-
-    /** 更新 user 或 assistant 气泡（流式、错误态等） */
-    updateTurnBubble(
-      uuid: number,
-      index: number,
-      role: 'user' | 'assistant',
-      patch: Partial<Chat.Bubble & { reasoning_content?: string }>,
-    ) {
-      const { reasoning_content, ...bubblePatch } = patch
-      const turnPatch: Partial<Chat.ChatTurn> = role === 'user'
-        ? { user: { role: 'user', ...bubblePatch } as Chat.ChatTurn['user'] }
-        : {
-            assistant: {
-              role: 'assistant',
-              ...(reasoning_content !== undefined ? { reasoning_content } : {}),
-              ...bubblePatch,
-            } as Chat.ChatTurn['assistant'],
-          }
-      this.updateTurnSome(uuid, index, turnPatch)
-    },
-
-    /** 删除一轮（对应原版 deleteChatByUuid） */
-    deleteTurn(uuid: number, index: number) {
-      if (!uuid || uuid === 0) {
-        if (this.sessions.length) {
-          this.sessions[0].context.splice(index, 1)
-          this.recordState()
-        }
-        return
-      }
-
-      const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if (sessionIndex !== -1) {
-        this.sessions[sessionIndex].context.splice(index, 1)
-        this.recordState()
-      }
-    },
-
-    /** 清空当前会话上下文（对应原版 clearChatByUuid） */
-    clearContext(uuid: number) {
-      if (!uuid || uuid === 0) {
-        if (this.sessions.length) {
-          this.sessions[0].context = []
-          this.recordState()
-        }
-        return
-      }
-
-      const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if (sessionIndex !== -1) {
-        this.sessions[sessionIndex].context = []
-        this.recordState()
-      }
-    },
-    cutUpContext(uuid: number, count: number,prompt?:string) {
-      const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if (sessionIndex !== -1) {
-        let currentTurn = this.sessions[sessionIndex].context[count]
-        if (prompt) {
-          currentTurn.user.text = prompt
-        }
-        this.sessions[sessionIndex].context = this.sessions[sessionIndex].context.slice(0, count)
-        this.recordState()
-      }
-    },
-
     /** 清空全部会话（对应原版 clearHistory） */
     clearSessions() {
       this.$state = { ...defaultState() }
@@ -304,13 +184,4 @@ export const useSessionStore = defineStore('session-store', {
   },
 })
 
-function mergeTurn(current: Chat.ChatTurn, patch: Partial<Chat.ChatTurn>): Chat.ChatTurn {
-  return {
-    ...current,
-    ...patch,
-    user: patch.user ? { ...current.user, ...patch.user, role: 'user' } : current.user,
-    assistant: patch.assistant
-      ? { ...current.assistant, ...patch.assistant, role: 'assistant' }
-      : current.assistant,
-  }
-}
+

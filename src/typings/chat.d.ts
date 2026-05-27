@@ -19,6 +19,7 @@ declare namespace Chat {
 		uuid: number
 	}
 // 会话数组
+
 	interface ChatState {
 		active: number | null
 		usingContext: boolean;
@@ -29,11 +30,9 @@ declare namespace Chat {
 
 	// 气泡数据
 	interface Bubble{
-		dateTime?: string
+		dateTime: string
 		text: string | null
-		inversion?: boolean
 		error?: boolean
-		loading?: boolean
 	}
    interface UserBubble extends Bubble{
 	   role:"user"
@@ -45,8 +44,7 @@ declare namespace Chat {
 
 	// 单轮对话
 	interface ChatTurn{
-          count:number
-          dateTime?:string
+          turnIndex:number
           user:UserBubble
           assistant:AssistantBubble
 	}
@@ -57,7 +55,6 @@ declare namespace Chat {
 		title:string
 		uuid:number
 		context:ChatTurn[]
-		isEdit:boolean
 		createTime?:string
 	}
 	// state

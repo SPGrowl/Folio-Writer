@@ -4,7 +4,16 @@ import { router } from '@/router'
 import { t } from '@/locales'
 
 export const useChatStore = defineStore('chat-store', {
+  // 会话数组，形如：
+  // interface ChatState {
+	// 	active: number | null
+	// 	usingContext: boolean;
+	// 	history: History[]
+	// 	//{ uuid: number; data: Chat[] }：单个会话的对话数组，包装一层data和uuid
+	// 	chat: { uuid: number; data: Chat[] }[]
+	// }
   state: (): Chat.ChatState => getLocalState(),
+  
 
 	// export interface Chat.ChatState {
 	//     active: number | null
@@ -197,9 +206,18 @@ export const useChatStore = defineStore('chat-store', {
       this.recordState()
     },
 
+    async goHome() {
+      this.active = null
+      this.recordState()
+      await router.push({ name: 'Home' })
+    },
+
     async reloadRoute(uuid?: number) {
       this.recordState()
-      await router.push({ name: 'Chat', params: { uuid } })
+      if (uuid)
+        await router.push({ name: 'Chat', params: { uuid: String(uuid) } })
+      else
+        await router.push({ name: 'Home' })
     },
 
     recordState() {

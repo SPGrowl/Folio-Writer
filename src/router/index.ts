@@ -9,8 +9,14 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Root',
     component: ChatLayout,
-    redirect: '/chat',
+    redirect: '/home',
     children: [
+      // 起始页
+      {
+        path: '/home',
+        name: 'Home',
+        component: () => import('@/views/chat/home/index.vue'),
+      },
       {
         // 匹配聊天页面，路径为/chat/:uuid?，其中:uuid是可选参数
         path: '/chat/:uuid?',

@@ -1,18 +1,31 @@
 <script setup lang='ts'>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { NLayout, NLayoutContent } from 'naive-ui'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Sider from './sider/index.vue'
 import Permission from './Permission.vue'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { useAppStore, useAuthStore, useChatStore } from '@/store'
 
+const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const chatStore = useChatStore()
 const authStore = useAuthStore()
 
-router.replace({ name: 'Chat', params: { uuid: chatStore.active } })
+function syncActiveRoute() {
+  if (route.name === 'Home')
+    return
+
+  if (chatStore.active)
+    router.replace({ name: 'Chat', params: { uuid: String(chatStore.active) } })
+}
+
+watch(
+  () => route.name,
+  () => syncActiveRoute(),
+  { immediate: true },
+)
 
 const { isMobile } = useBasicLayout()
 

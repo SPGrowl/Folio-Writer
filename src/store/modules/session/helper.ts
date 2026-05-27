@@ -10,7 +10,6 @@ export function defaultState(): Chat.SessionState {
     sessions: [{
       uuid,
       title: t('chat.newChatTitle'),
-      isEdit: false,
       context: [],
       createTime: new Date().toISOString(),
     }],
