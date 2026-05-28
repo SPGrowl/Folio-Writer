@@ -60,7 +60,7 @@ function handleEnter(event: KeyboardEvent) {
   if (!isMobile.value) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-    
+
     }
   }
   else if (event.key === 'Enter' && event.ctrlKey) {

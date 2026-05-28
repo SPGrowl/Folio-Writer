@@ -5,14 +5,14 @@ import { SvgIcon } from '@/components/common'
 import { useAppStore, useChatStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { debounce } from '@/utils/functions/debounce'
-
+import {useSessionStore} from "@/store";
 const { isMobile } = useBasicLayout()
 
 const appStore = useAppStore()
 const chatStore = useChatStore()
-
+const sessionStore = useSessionStore()
 const dataSources = computed(() => chatStore.history)
-
+const sessionSource=computed(()=>sessionStore.sessions)
 async function handleSelect({ uuid }: Chat.History) {
   if (isActive(uuid))
     return

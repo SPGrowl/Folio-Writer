@@ -66,7 +66,6 @@ export const useSessionStore = defineStore('session-store', {
         // 思考中
         },
       }]
-
       const newSession: Chat.Session = {
         uuid,
         title: t('chat.newChatTitle'),
@@ -80,7 +79,7 @@ export const useSessionStore = defineStore('session-store', {
     },
 
 		//TODO:发出Prompt（应该放在API层或者UI层）
-    
+
     /** 切换当前会话（对应原版 setActive） */
     async setActive(uuid: number) {
       this.activeUuid = uuid
@@ -116,7 +115,7 @@ export const useSessionStore = defineStore('session-store', {
       currentTurn.assistant.text=null
       // 从此处截断上下文
       this.sliceContext(uuid,turnIndex)
-    },     
+    },
     addTurn(uuid: number, text: string) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
       if(sessionIndex === -1)
@@ -152,7 +151,7 @@ export const useSessionStore = defineStore('session-store', {
         request.push({role:user.role,content:user.text as string })
       }
       }
-      return request    
+      return request
     },
     sliceContext(uuid: number, turnIndex: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)

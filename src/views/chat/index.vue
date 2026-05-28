@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import Bubble from "@/views/chat/components/Bubble/index.vue"
 import {
 	NAutoComplete,
 	NButton,
@@ -13,6 +14,7 @@ import {
 	NDropdown,
 	DropdownOption
 } from 'naive-ui'
+import {useSessionStore} from "@/store";
 import {useSettingStore} from "@/store";
 import { toPng } from 'html-to-image'
 import { Message } from './components'
@@ -36,7 +38,7 @@ const dialog = useDialog()
 const ms = useMessage()
 
 const chatStore = useChatStore()
-
+const sessionStore = useSessionStore()
 const { isMobile } = useBasicLayout()
 const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
 const { scrollRef, scrollToBottom, scrollToBottomIfAtBottom } = useScroll()
@@ -47,6 +49,8 @@ const { uuid } = route.params as { uuid: string }
 
 // 从store中获取本次聊天数据
 const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
+const sessionSource = computed(() => sessionStore.getSessionByUuid(
+	1779882734272))
 const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
 // 输入框内容
 const prompt = ref<string>('')
@@ -522,10 +526,9 @@ onUnmounted(() => {
           :class="[isMobile ? 'p-2' : 'p-4']"
         >
           <div id="image-wrapper" class="relative">
+<!--						TODO:将在后续的版本中删除-->
             <template v-if="!dataSources.length">
               <div class="flex items-center justify-center mt-4 text-center text-neutral-300">
-<!--                <SvgIcon icon="ri:bubble-chart-fill" class="mr-2 text-3xl" />-->
-<!--                <span>{{ t('chat.newChatTitle') }}</span>-->
 								<SvgIcon icon="si:ai-chat-line" class="mr-2 text-3xl" />
 								<span>{{ t('common.welcome') }}</span>
               </div>
@@ -544,16 +547,11 @@ onUnmounted(() => {
                   @regenerate="onRegenerate(index)"
                   @delete="handleDelete(index)"
                 />
-<!--								已被合并到发送按钮中-->
-<!--                <div class="sticky bottom-0 left-0 flex justify-center">-->
-<!--                  <NButton v-if="loading" type="warning" @click="handleStop">-->
-<!--                    <template #icon>-->
-<!--                      <SvgIcon icon="ri:stop-circle-line" />-->
-<!--                    </template>-->
-<!--                    {{ t('common.stopResponding') }}-->
-<!--                  </NButton>-->
-<!--                </div>-->
               </div>
+							<div v-for="(turn,count) in sessionSource.context" :key="count">
+
+								<Bubble v-bind="turn.user"></Bubble>
+							</div>
             </template>
           </div>
         </div>
