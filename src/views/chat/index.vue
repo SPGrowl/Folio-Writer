@@ -49,8 +49,7 @@ const { uuid } = route.params as { uuid: string }
 
 // 从store中获取本次聊天数据
 const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
-const sessionSource = computed(() => sessionStore.getSessionByUuid(
-	1779882734272))
+const sessionSource = computed(() => sessionStore.getSessionByUuid(sessionStore.activeUuid))
 const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
 // 输入框内容
 const prompt = ref<string>('')
@@ -83,283 +82,15 @@ const modelList:DropdownOption[] = [
 	}
 ]
 function handleSubmit() {
-  onConversation()
-}
-
-async function onConversation() {
-  let message = prompt.value
-
-  // 检测是否正在加载，TODO：建议加入提示信息：消息生成中，请稍后重试
-  if (loading.value)
-    return
-// TODO：建议加入提示信息：请输入内容
-  if (!message || message.trim() === '')
-    return
-
-  controller = new AbortController()
-
-  // 插入用户气泡
-  addChat(
-    +uuid,
-    {
-      dateTime: new Date().toLocaleString(),
-      text: message,
-      inversion: true,
-      error: false,
-      conversationOptions: null,
-      // 记录本轮提示词，便于复用
-      requestOptions: { prompt: message, options: null },
-    },
-  )
-  scrollToBottom()
-
-  loading.value = true
+  // onConversation()
+  sessionStore.addTurn(sessionStore.activeUuid as number, prompt.value)
   prompt.value = ''
-
-  let options: Chat.ConversationRequest = {}
-  const lastContext = conversationList.value[conversationList.value.length - 1]?.conversationOptions
-
-  if (lastContext && usingContext.value)
-    options = { ...lastContext }
-// 插入回复占位气泡
-  addChat(
-    +uuid,
-    {
-      dateTime: new Date().toLocaleString(),
-      text: t('chat.thinking'),
-      loading: true,
-      inversion: false,
-      error: false,
-      conversationOptions: null,
-      requestOptions: { prompt: message, options: { ...options } },
-    },
-  )
-  // 滚动到底部
-  scrollToBottom()
-
-  try {
-    let lastText = ''
-    // 定义一个异步函数
-    const fetchChatAPIOnce = async () => {
-      await fetchChatAPIProcess<Chat.ConversationResponse>({
-        prompt: message,
-        options,
-        signal: controller.signal,
-        // TODO:下载进度回调 ??
-        onDownloadProgress: ({ event }) => {
-          const xhr = event.target
-          // 解构出响应文本
-          const { responseText } = xhr
-          //读取最后一个字符
-          const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
-          let chunk = responseText
-          // 若最后一个字符有效，把最后一个字符拼接到chunk中
-          if (lastIndex !== -1)
-            chunk = responseText.substring(lastIndex)
-
-            //?
-            try {
-              // 将chunk解析为实际的JS数据结构
-            const data = JSON.parse(chunk)
-            // 更新回复气泡
-            updateChat(
-              +uuid,
-              // 指定更新最后一条回复占位气泡
-              dataSources.value.length - 1,
-              {
-                dateTime: new Date().toLocaleString(),
-                // 实际的回复文本:
-                text: lastText + (data.text ?? ''),
-                inversion: false,
-                error: false,
-                loading: true,
-                conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-                requestOptions: { prompt: message, options: { ...options } },
-              },
-            )
-
-// 处理长回复
-            if (openLongReply && data.detail.choices[0].finish_reason === 'length') {
-              options.parentMessageId = data.id
-              lastText = data.text
-              message = ''
-              return fetchChatAPIOnce()
-            }
-
-            scrollToBottomIfAtBottom()
-          }
-          catch (error) {
-            //
-          }
-        },
-      })
-      // 单次请求结束
-      updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
-    }
-// 执行请求函数
-    await fetchChatAPIOnce()
-  }
-  catch (error: any) {
-    const errorMessage = error?.message ?? t('common.wrong')
-// 请求中止
-    if (error.message === 'canceled') {
-      updateChatSome(
-        +uuid,
-        dataSources.value.length - 1,
-        {
-          loading: false,
-        },
-      )
-      scrollToBottomIfAtBottom()
-      return
-    }
-
-    const currentChat = getChatByUuidAndIndex(+uuid, dataSources.value.length - 1)
-
-    if (currentChat?.text && currentChat.text !== '') {
-      // 追加一行错误信息
-      updateChatSome(
-        +uuid,
-        dataSources.value.length - 1,
-        {
-          text: `${currentChat.text}\n[${errorMessage}]`,
-          error: false,
-          loading: false,
-        },
-      )
-      return
-    }
-// 没有有效正文
-    updateChat(
-      +uuid,
-      dataSources.value.length - 1,
-      {
-        dateTime: new Date().toLocaleString(),
-        text: errorMessage,
-        inversion: false,
-        error: true,
-        loading: false,
-        conversationOptions: null,
-        requestOptions: { prompt: message, options: { ...options } },
-      },
-    )
-    scrollToBottomIfAtBottom()
-  }
-  finally {
-    loading.value = false
-  }
+  // TODO：发送请求，更新store
+  const requestBody:OpenAI.Message[]=sessionStore.composeRequest(sessionStore.activeUuid as number, (sessionSource.value?.context.length as number-1) as number)
+//  
 }
 
-async function onRegenerate(index: number) {
-  if (loading.value)
-    return
 
-  controller = new AbortController()
-
-  const { requestOptions } = dataSources.value[index]
-
-  let message = requestOptions?.prompt ?? ''
-
-  let options: Chat.ConversationRequest = {}
-
-  if (requestOptions.options)
-    options = { ...requestOptions.options }
-
-  loading.value = true
-
-  updateChat(
-    +uuid,
-    index,
-    {
-      dateTime: new Date().toLocaleString(),
-      text: '',
-      inversion: false,
-      error: false,
-      loading: true,
-      conversationOptions: null,
-      requestOptions: { prompt: message, options: { ...options } },
-    },
-  )
-
-  try {
-    let lastText = ''
-    const fetchChatAPIOnce = async () => {
-      await fetchChatAPIProcess<Chat.ConversationResponse>({
-        prompt: message,
-        options,
-        signal: controller.signal,
-        onDownloadProgress: ({ event }) => {
-          const xhr = event.target
-          const { responseText } = xhr
-          // Always process the final line
-          const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
-          let chunk = responseText
-          if (lastIndex !== -1)
-            chunk = responseText.substring(lastIndex)
-          try {
-            const data = JSON.parse(chunk)
-            updateChat(
-              +uuid,
-              index,
-              {
-                dateTime: new Date().toLocaleString(),
-                text: lastText + (data.text ?? ''),
-                inversion: false,
-                error: false,
-                loading: true,
-                conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-                requestOptions: { prompt: message, options: { ...options } },
-              },
-            )
-
-            if (openLongReply && data.detail.choices[0].finish_reason === 'length') {
-              options.parentMessageId = data.id
-              lastText = data.text
-              message = ''
-              return fetchChatAPIOnce()
-            }
-          }
-          catch (error) {
-            //
-          }
-        },
-      })
-      updateChatSome(+uuid, index, { loading: false })
-    }
-    await fetchChatAPIOnce()
-  }
-  catch (error: any) {
-    if (error.message === 'canceled') {
-      updateChatSome(
-        +uuid,
-        index,
-        {
-          loading: false,
-        },
-      )
-      return
-    }
-
-    const errorMessage = error?.message ?? t('common.wrong')
-
-    updateChat(
-      +uuid,
-      index,
-      {
-        dateTime: new Date().toLocaleString(),
-        text: errorMessage,
-        inversion: false,
-        error: true,
-        loading: false,
-        conversationOptions: null,
-        requestOptions: { prompt: message, options: { ...options } },
-      },
-    )
-  }
-  finally {
-    loading.value = false
-  }
-}
 
 function handleExport() {
   if (loading.value)
@@ -400,33 +131,11 @@ function handleExport() {
 }
 
 function handleDelete(index: number) {
-  if (loading.value)
-    return
-
-  dialog.warning({
-    title: t('chat.deleteMessage'),
-    content: t('chat.deleteMessageConfirm'),
-    positiveText: t('common.yes'),
-    negativeText: t('common.no'),
-    onPositiveClick: () => {
-      chatStore.deleteChatByUuid(+uuid, index)
-    },
-  })
+ 
 }
 
 function handleClear() {
-  if (loading.value)
-    return
-
-  dialog.warning({
-    title: t('chat.clearChat'),
-    content: t('chat.clearChatConfirm'),
-    positiveText: t('common.yes'),
-    negativeText: t('common.no'),
-    onPositiveClick: () => {
-      chatStore.clearChatByUuid(+uuid)
-    },
-  })
+ 
 }
 
 // 处理回车键事件
@@ -525,37 +234,13 @@ onUnmounted(() => {
           class="w-full max-w-screen-xl m-auto dark:bg-[#101014]"
           :class="[isMobile ? 'p-2' : 'p-4']"
         >
-          <div id="image-wrapper" class="relative">
-<!--						TODO:将在后续的版本中删除-->
-            <template v-if="!dataSources.length">
-              <div class="flex items-center justify-center mt-4 text-center text-neutral-300">
-								<SvgIcon icon="si:ai-chat-line" class="mr-2 text-3xl" />
-								<span>{{ t('common.welcome') }}</span>
-              </div>
-            </template>
-            <template v-else>
-              <div>
 <!--对话列表，对应着对话区-->
-                <Message
-                  v-for="(item, index) of dataSources"
-                  :key="index"
-                  :date-time="item.dateTime"
-                  :text="item.text"
-                  :inversion="item.inversion"
-                  :error="item.error"
-                  :loading="item.loading"
-                  @regenerate="onRegenerate(index)"
-                  @delete="handleDelete(index)"
-                />
               </div>
-							<div v-for="(turn,count) in sessionSource.context" :key="count">
-
-								<Bubble v-bind="turn.user"></Bubble>
+							<div v-for="(turn,turnIndex) in sessionSource.context " :key="turnIndex">
+								<Bubble v-bind="turn.user" :turnIndex="turnIndex" ></Bubble>
+                <Bubble v-bind="turn.assistant" :turnIndex="turnIndex" ></Bubble>
 							</div>
-            </template>
           </div>
-        </div>
-      </div>
     </main>
     <footer :class="footerClass">
       <div class="w-full max-w-screen-xl m-auto">

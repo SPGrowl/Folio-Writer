@@ -61,6 +61,26 @@ export function fetchChatAPIProcess<T = any>(
     onDownloadProgress: params.onDownloadProgress,
   })
 }
+export function submitRequestBody<T = any>(messages:OpenAI.Message[]){
+ const settingStore = useSettingStore()
+ const data:OpenAI.OpenAIRequest={
+  model:settingStore.modelName,
+  extra_body: {
+    thinking: { type: "enabled" },
+  },
+  reasoning_effort: "high",
+  temperature:settingStore.temperature,
+  top_p:settingStore.top_p,
+  stream:true,
+  messages,
+ }
+  return post<T>({
+    url: '/chat-process',
+    data,
+    // TODO:是否添加该字段存疑，
+    // signal: params.signal,
+  })
+}
 
 export function fetchSession<T>() {
   return post<T>({

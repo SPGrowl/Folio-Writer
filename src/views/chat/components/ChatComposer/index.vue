@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { NButton, NInput } from 'naive-ui'
 import { SvgIcon } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { t } from '@/locales'
 import { useSessionStore } from '@/store'
+
 interface Props {
   size?: 'default' | 'large'
-  static?: boolean
 }
-const sessionStore = useSessionStore()
+
 const props = withDefaults(defineProps<Props>(), {
   size: 'default',
-  static:true,
+  static: true,
 })
 
-const emit = defineEmits<{
-  (ev: 'submit', value: string): void
-}>()
-
+const sessionStore = useSessionStore()
 const { isMobile } = useBasicLayout()
 
 const prompt = ref('')
@@ -31,20 +28,14 @@ const placeholder = computed(() => {
   return t('chat.placeholder')
 })
 
-const buttonDisabled = computed(() => {
-  return props.static || !prompt.value || prompt.value.trim() === ''
-})
+const canSend = computed(() => prompt.value.trim().length > 0)
 
-const rootClass = computed(() => {
-  return [
-    'flex items-end w-full',
-    isLarge.value ? 'gap-3' : 'gap-2',
-  ]
-})
+const rootClass = computed(() => [
+  'flex items-end w-full',
+  isLarge.value ? 'gap-3' : 'gap-2',
+])
 
-const inputClass = computed(() => {
-  return isLarge.value ? 'home-composer-input' : ''
-})
+const inputClass = computed(() => (isLarge.value ? 'home-composer-input' : ''))
 
 const autosize = computed(() => {
   if (isLarge.value)
@@ -52,20 +43,41 @@ const autosize = computed(() => {
   return { minRows: 1, maxRows: isMobile.value ? 4 : 8 }
 })
 
-function createSession() {
-  sessionStore.createSession(prompt.value.trim())
-}
-// 实现换行功能
-function handleEnter(event: KeyboardEvent) {
-  if (!isMobile.value) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
+function insertNewline(event: KeyboardEvent) {
+  const target = event.target as HTMLTextAreaElement | null
+  if (!target || target.selectionStart == null)
+    return
 
-    }
+  event.preventDefault()
+  const start = target.selectionStart
+  const end = target.selectionEnd ?? start
+  const value = prompt.value
+  prompt.value = `${value.slice(0, start)}\n${value.slice(end)}`
+  nextTick(() => {
+    target.selectionStart = target.selectionEnd = start + 1
+  })
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter')
+    return
+
+  if (event.ctrlKey) {
+    insertNewline(event)
+    return
   }
-  else if (event.key === 'Enter' && event.ctrlKey) {
-    event.preventDefault()
-  }
+
+  event.preventDefault()
+  handleSend()
+}
+
+function handleSend() {
+  const text = prompt.value.trim()
+  if (!text)
+    return
+
+  sessionStore.createSession(text)
+  prompt.value = ''
 }
 </script>
 
@@ -77,23 +89,23 @@ function handleEnter(event: KeyboardEvent) {
       :class="inputClass"
       :placeholder="placeholder"
       :autosize="autosize"
-      :disabled="!static"
-      @keypress="handleEnter"
+      @keydown="handleKeydown"
     >
-			<template #suffix> <NButton
-				type="primary"
-				:size="isLarge ? 'large' : 'medium'"
-				:disabled="!prompt.trim().length"
-				@click="createSession"
-			>
-				<template #icon>
-        <span :class="isLarge ? 'text-2xl' : ''" class="dark:text-black">
-          <SvgIcon icon="ri:send-plane-fill" />
-        </span>
-				</template>
-			</NButton></template>
-		</NInput>
-
+      <template #suffix>
+        <NButton
+          type="primary"
+          :size="isLarge ? 'large' : 'medium'"
+          :disabled="!canSend"
+          @click="handleSend"
+        >
+          <template #icon>
+            <span :class="isLarge ? 'text-2xl' : ''" class="dark:text-black">
+              <SvgIcon icon="ri:send-plane-fill" />
+            </span>
+          </template>
+        </NButton>
+      </template>
+    </NInput>
   </div>
 </template>
 

@@ -7,7 +7,7 @@ import { SvgIcon } from '@/components/common'
 import { t } from '@/locales'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { copyToClip } from '@/utils/copy'
-
+import { useSessionStore } from '@/store'
 interface Emit {
   (ev: 'regenerate'): void
   (ev: 'delete'): void
@@ -19,27 +19,30 @@ interface Props {
 	text: string | null
 	error?: boolean
 	loading?: boolean
-	reasoning_content?: string  // 仅 assistant 时有意义
+	reasoning_content?: string 
+  turnIndex: number
+   // 仅 assistant 时有意义
 }
-
+const sessionStore = useSessionStore()
 const props = defineProps<Props>()
-console.log(props)
 const isUser = computed(() => props.role === 'user')
 const emit = defineEmits<Emit>()
 const { isMobile } = useBasicLayout()
-const loading=computed(() => {
-	if (props.role==="user")
-	{
-		return false
-	}
-	else{
-		return props.text === null || props.text === "" || props.text === undefined;
-	}
+const loading = computed(() => {
+  if (props.role === 'user')
+    return false
+  return props.text === null || props.text === '' || props.text === undefined
 })
+
+const hasReasoning = computed(() => {
+  return !isUser.value && !!props.reasoning_content?.trim()
+})
+
+const reasoningExpanded = ref(true)
 const message = useMessage()
 
 const asRawText = ref(props.role === 'user')
-const editDraft = ref<string>('')
+const editDraft = ref<string>(props.text as string)
 const isEditing = ref<boolean>(false)
 const showActions = ref<boolean>(false)
 async function handleCopy() {
@@ -53,7 +56,6 @@ async function handleCopy() {
 }
 
 function updatePrompt() {
-  editDraft.value = props.text as string
   isEditing.value = true
 }
 
@@ -62,9 +64,9 @@ function handleCancelEdit() {
   editDraft.value = ''
 }
 function handleSubmitEdit() {
+  sessionStore.retryTurn(sessionStore.activeUuid as number, props.turnIndex, editDraft.value)
+  // TODO:发送请求，更新store
   isEditing.value = false
-  editDraft.value = ''
-  // TODO:将本次编辑的Prompt发送，并更新会话
 }
 </script>
 
@@ -83,9 +85,38 @@ function handleSubmitEdit() {
       <p class="text-xs text-[#b4bbc4]" :class="[isUser ? 'text-right' : 'text-left']">
         {{ dateTime }}
       </p>
+
       <div
-        class="flex items-end gap-1 mt-2"
-        :class="[isUser ? 'flex-row-reverse' : 'flex-row']"
+        v-if="hasReasoning"
+        class="reasoning-block mt-2 mb-3 max-w-full"
+        :class="[isUser ? 'text-right' : 'text-left']"
+      >
+        <button
+          type="button"
+          class="reasoning-header inline-flex items-center gap-1 text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-[#8b929a] dark:hover:text-[#b4bbc4]"
+          @click="reasoningExpanded = !reasoningExpanded"
+        >
+          <SvgIcon icon="mdi:atom" class="text-sm text-[#4b9e5f]" />
+          <span>{{ t('chat.thinking') }}</span>
+          <SvgIcon
+            :icon="reasoningExpanded ? 'ri:arrow-up-s-line' : 'ri:arrow-down-s-line'"
+            class="text-sm"
+          />
+        </button>
+        <div
+          v-show="reasoningExpanded"
+          class="reasoning-body mt-2 border-l border-neutral-300 pl-3 text-xs leading-relaxed text-neutral-500 break-words whitespace-pre-wrap dark:border-[#3d4450] dark:text-[#8b929a]"
+        >
+          {{ reasoning_content }}
+        </div>
+      </div>
+
+      <div
+        class="flex items-end gap-1"
+        :class="[
+          isUser ? 'flex-row-reverse' : 'flex-row',
+          hasReasoning ? '' : 'mt-2',
+        ]"
       >
         <div
           class="relative max-w-full"
@@ -97,7 +128,7 @@ function handleSubmitEdit() {
             v-if="!isEditing"
             :inversion="isUser"
             :error="error"
-            :text="text"
+            :text="text??'Waiting for response...'"
             :loading="loading"
             :as-raw-text="asRawText"
           />

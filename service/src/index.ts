@@ -5,7 +5,7 @@ import { chatConfig, chatReplyProcess, currentModel } from './chatgpt'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
 import { isNotEmptyString } from './utils/is'
-
+import { streamChatCompletion } from './oepnai/stream'
 const app = express()
 const router = express.Router()
 
@@ -22,36 +22,40 @@ app.all('*', (_, res, next) => {
 
 router.post('/chat-process', [auth, limiter], async (req, res) => {
   // 声明响应体为任意二进制流，用于流式输出
-  res.setHeader('Content-type', 'application/octet-stream')
-
-  try {
-    // TODO：req.body的实际数据结构是什么？为什么不是解构data部分？
-    const { prompt, options = {}, systemMessage, temperature, top_p ,model} = req.body as RequestProps
-    let firstChunk = true
-
-    //调用chatReplyProcess函数，处理请求
-    await chatReplyProcess(
-      // 以下为整个实参option
-      {
-      message: prompt,
-      lastContext: options,
-      process: (chat: ChatMessage) => {
-        // 如果第一个分块，则发送完整的JSON对象，否则发送换行符和JSON对象
-        res.write(firstChunk ? JSON.stringify(chat) : `\n${JSON.stringify(chat)}`)
-        firstChunk = false
-      },
-      systemMessage,
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
+  res.setHeader('Connection', 'keep-alive')
+  try{
+  const {
+    model,
+    messages,
+    temperature,
+    top_p,
+    stream,
+    extra_body,
+    reasoning_effort,
+  } = req.body
+  await streamChatCompletion(
+    {
+      model,
+      messages,
       temperature,
-				top_p,
-				model,
-    })
-  }
-  catch (error) {
-    res.write(JSON.stringify(error))
-  }
-  finally {
-    res.end()
-  }
+      top_p,
+      stream: true,
+      // DeepSeek 扩展字段按你网关实际支持方式传入
+      ...(extra_body ?? {}),
+      ...(reasoning_effort ? { reasoning_effort } : {}),
+    },
+    res,
+  )
+}
+catch (error: any) {
+  res.write(`data: ${JSON.stringify({ error: { message: error.message } })}\n\n`)
+}
+finally {
+  res.end()
+}
+
 })
 
 router.post('/config', auth, async (req, res) => {
