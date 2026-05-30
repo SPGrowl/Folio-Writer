@@ -1,3 +1,4 @@
+// ========== 已废弃：旧版 chatgpt 库实现，由 oepnai/ 目录下的标准 OpenAI SDK 替代 ==========
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'

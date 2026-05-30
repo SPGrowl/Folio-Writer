@@ -1,22 +1,20 @@
-import type { AxiosProgressEvent, GenericAbortSignal } from 'axios'
 import { post } from '@/utils/request'
-import { useAuthStore, useSettingStore } from '@/store'
+import { streamChatProcess, type StreamChatOptions } from '@/utils/stream/openai'
+import { useSettingStore } from '@/store'
 
+// ========== 以下为旧版 chatgpt 库协议，已废弃，保留备查 ==========
 
-// 参数:本次提示词Prompt,本次会话ID,parentMessageId,
-// promt,option会被打包放入data中
-// signal为最终POST请求的单独参数
-export function fetchChatAPI<T = any>(
-  prompt: string,
-  options?: { conversationId?: string; parentMessageId?: string },
-  signal?: GenericAbortSignal,
-) {
-  return post<T>({
-    url: '/chat',
-    data: { prompt, options },
-    signal,
-  })
-}
+// export function fetchChatAPI<T = any>(
+//   prompt: string,
+//   options?: { conversationId?: string; parentMessageId?: string },
+//   signal?: GenericAbortSignal,
+// ) {
+//   return post<T>({
+//     url: '/chat',
+//     data: { prompt, options },
+//     signal,
+//   })
+// }
 
 export function fetchChatConfig<T = any>() {
   return post<T>({
@@ -24,62 +22,60 @@ export function fetchChatConfig<T = any>() {
   })
 }
 
-// 发送请求到后端
-export function fetchChatAPIProcess<T = any>(
-  params: {
-    prompt: string
-    options?: { conversationId?: string; parentMessageId?: string }
-    signal?: GenericAbortSignal
-    // 下载进度回调
-    onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void },
-) {
-  // 获取系统配置消息（默认提示词等）
-  const settingStore = useSettingStore()
-  const authStore = useAuthStore()
+// export function fetchChatAPIProcess<T = any>(
+//   params: {
+//     prompt: string
+//     options?: { conversationId?: string; parentMessageId?: string }
+//     signal?: GenericAbortSignal
+//     onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void
+//   },
+// ) {
+//   const settingStore = useSettingStore()
+//   const authStore = useAuthStore()
+//   let data: Record<string, any> = {
+//     prompt: params.prompt,
+//     options: params.options,
+//   }
+//   if (authStore.isChatGPTAPI) {
+//     data = {
+//       ...data,
+//       systemMessage: settingStore.systemMessage,
+//       temperature: settingStore.temperature,
+//       top_p: settingStore.top_p,
+//       model: settingStore.modelName,
+//     }
+//   }
+//   return post<T>({
+//     url: '/chat-process',
+//     data,
+//     signal: params.signal,
+//     onDownloadProgress: params.onDownloadProgress,
+//   })
+// }
 
-  // 设置请求参数
-  let data: Record<string, any> = {
-    prompt: params.prompt,
-    options: params.options,
+// ========== 新版 OpenAI 标准流式请求 ==========
+
+/**
+ * 组合 OpenAI 请求体并发起 SSE 流式对话。
+ * messages 由 sessionStore.composeRequest 生成。
+ */
+export function submitRequestBody(
+  messages: OpenAI.Message[],
+  options: StreamChatOptions,
+) {
+  const settingStore = useSettingStore()
+  const data: OpenAI.OpenAIRequest = {
+    model: settingStore.modelName,
+    messages,
+    temperature: settingStore.temperature,
+    top_p: settingStore.top_p,
+    extra_body: {
+      thinking: { type: 'enabled' },
+    },
+    reasoning_effort: 'high',
+    stream: true,
   }
-// 如果使用ChatGPTAPI，则设置系统消息、温度、top_p
-  if (authStore.isChatGPTAPI) {
-    data = {
-      // 合并data与其他Open API请求字段
-      ...data,
-      systemMessage: settingStore.systemMessage,
-      temperature: settingStore.temperature,
-      top_p: settingStore.top_p,
-			model:settingStore.modelName
-    }
-  }
-// 返回一个指向/chat-process的POSt请求交给后端路由进行后续工作
-  return post<T>({
-    url: '/chat-process',
-    data,
-    signal: params.signal,
-    onDownloadProgress: params.onDownloadProgress,
-  })
-}
-export function submitRequestBody<T = any>(messages:OpenAI.Message[]){
- const settingStore = useSettingStore()
- const data:OpenAI.OpenAIRequest={
-  model:settingStore.modelName,
-  extra_body: {
-    thinking: { type: "enabled" },
-  },
-  reasoning_effort: "high",
-  temperature:settingStore.temperature,
-  top_p:settingStore.top_p,
-  stream:true,
-  messages,
- }
-  return post<T>({
-    url: '/chat-process',
-    data,
-    // TODO:是否添加该字段存疑，
-    // signal: params.signal,
-  })
+  return streamChatProcess(data, options)
 }
 
 export function fetchSession<T>() {

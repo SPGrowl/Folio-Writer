@@ -3,94 +3,128 @@ import type { Ref } from 'vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import Bubble from "@/views/chat/components/Bubble/index.vue"
+import Bubble from '@/views/chat/components/Bubble/index.vue'
 import {
-	NAutoComplete,
-	NButton,
-	NInput,
-	NTooltip,
-	useDialog,
-	useMessage,
-	NDropdown,
-	DropdownOption
+  NAutoComplete,
+  NButton,
+  NInput,
+  NTooltip,
+  useDialog,
+  useMessage,
+  NDropdown,
+  DropdownOption,
 } from 'naive-ui'
-import {useSessionStore} from "@/store";
-import {useSettingStore} from "@/store";
+import { useSessionStore, useSettingStore, usePromptStore } from '@/store'
 import { toPng } from 'html-to-image'
-import { Message } from './components'
 import { useScroll } from './hooks/useScroll'
-import { useChat } from './hooks/useChat'
 import { useUsingContext } from './hooks/useUsingContext'
 import HeaderComponent from './components/Header/index.vue'
 import { HoverButton, SvgIcon } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
-import { useChatStore, usePromptStore } from '@/store'
-import { fetchChatAPIProcess } from '@/api'
+import { submitRequestBody } from '@/api'
 import { t } from '@/locales'
 import { useIconRender } from '@/hooks/useIconRender'
+
+// ========== 旧版 chatStore 相关，已废弃 ==========
+// import { Message } from './components'
+// import { useChat } from './hooks/useChat'
+// import { useChatStore } from '@/store'
+// import { fetchChatAPIProcess } from '@/api'
+// const chatStore = useChatStore()
+// const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
+// const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
+// const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
+// dataSources.value.forEach((item, index) => {
+//   if (item.loading)
+//     updateChatSome(+uuid, index, { loading: false })
+// })
+
 const { iconRender } = useIconRender()
 let controller = new AbortController()
-
-const openLongReply = import.meta.env.VITE_GLOB_OPEN_LONG_REPLY === 'true'
 
 const route = useRoute()
 const dialog = useDialog()
 const ms = useMessage()
 
-const chatStore = useChatStore()
 const sessionStore = useSessionStore()
 const { isMobile } = useBasicLayout()
-const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
 const { scrollRef, scrollToBottom, scrollToBottomIfAtBottom } = useScroll()
 const { usingContext, toggleUsingContext } = useUsingContext()
 
-// 路由参数中解构uuid
 const { uuid } = route.params as { uuid: string }
 
-// 从store中获取本次聊天数据
-const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
-const sessionSource = computed(() => sessionStore.getSessionByUuid(sessionStore.activeUuid))
-const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
-// 输入框内容
-const prompt = ref<string>('')
-  // 是否正在加载
-const loading = ref<boolean>(false)
-const inputRef = ref<Ref | null>(null)
-// 添加PromptStore
-const promptStore = usePromptStore()
-
-const settingStore = useSettingStore()
-// 使用storeToRefs，保证store修改后，联想部分能够重新渲染
-const { promptList: promptTemplate } = storeToRefs<any>(promptStore)
-
-// 未知原因刷新页面，loading 状态不会重置，手动重置
-dataSources.value.forEach((item, index) => {
-  if (item.loading)
-    updateChatSome(+uuid, index, { loading: false })
+const sessionSource = computed(() => {
+  const id = +uuid || sessionStore.activeUuid
+  if (id == null)
+    return null
+  return sessionStore.getSessionByUuid(id)
 })
 
-const modelList:DropdownOption[] = [
+const prompt = ref<string>('')
+const loading = ref<boolean>(false)
+const inputRef = ref<Ref | null>(null)
+const promptStore = usePromptStore()
+const settingStore = useSettingStore()
+const { promptList: promptTemplate } = storeToRefs<any>(promptStore)
+
+const modelList: DropdownOption[] = [
   {
     label: t('model.dsV4Flash'),
     key: 'deepseek-v4-flash',
-		icon: iconRender({ icon: 'logos:deepseek-icon' }),
+    icon: iconRender({ icon: 'logos:deepseek-icon' }),
   },
-	{
-		label: t('model.dsv4Pro'),
-		key: 'deepseek-v4-pro',
-		icon: iconRender({icon: 'logos:deepseek-icon'}),
-	}
+  {
+    label: t('model.dsv4Pro'),
+    key: 'deepseek-v4-pro',
+    icon: iconRender({ icon: 'logos:deepseek-icon' }),
+  },
 ]
-function handleSubmit() {
-  // onConversation()
-  sessionStore.addTurn(sessionStore.activeUuid as number, prompt.value)
-  prompt.value = ''
-  // TODO：发送请求，更新store
-  const requestBody:OpenAI.Message[]=sessionStore.composeRequest(sessionStore.activeUuid as number, (sessionSource.value?.context.length as number-1) as number)
-//  
+
+/** 对指定轮次发起 SSE 流式请求，增量更新 sessionStore */
+async function streamTurn(uuid: number, turnIndex: number) {
+  loading.value = true
+  controller = new AbortController()
+
+  const messages = sessionStore.composeRequest(uuid, turnIndex)
+
+  try {
+    await submitRequestBody(messages, {
+      signal: controller.signal,
+      onChunk(delta) {
+        sessionStore.appendAssistantDelta(uuid, turnIndex, delta)
+        scrollToBottomIfAtBottom()
+      },
+      onDone() {
+        sessionStore.finishTurn(uuid, turnIndex)
+        loading.value = false
+      },
+      onError(message) {
+        sessionStore.setTurnError(uuid, turnIndex, message)
+        loading.value = false
+      },
+    })
+  }
+  catch (error: any) {
+    if (error?.name === 'AbortError')
+      loading.value = false
+    else
+      sessionStore.setTurnError(uuid, turnIndex, error?.message ?? 'Request failed')
+    loading.value = false
+  }
 }
 
+async function handleSubmit() {
+  const activeUuid = sessionStore.activeUuid
+  const text = prompt.value.trim()
+  if (!activeUuid || !text || loading.value)
+    return
 
+  sessionStore.addTurn(activeUuid, text)
+  prompt.value = ''
+
+  const turnIndex = (sessionStore.getSessionByUuid(activeUuid)?.context.length ?? 1) - 1
+  await streamTurn(activeUuid, turnIndex)
+}
 
 function handleExport() {
   if (loading.value)
@@ -101,6 +135,7 @@ function handleExport() {
     content: t('chat.exportImageConfirm'),
     positiveText: t('common.yes'),
     negativeText: t('common.no'),
+ 
     onPositiveClick: async () => {
       try {
         d.loading = true
@@ -131,14 +166,11 @@ function handleExport() {
 }
 
 function handleDelete(index: number) {
- 
 }
 
 function handleClear() {
- 
 }
 
-// 处理回车键事件
 function handleEnter(event: KeyboardEvent) {
   if (!isMobile.value) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -160,14 +192,12 @@ function handleStop() {
     loading.value = false
   }
 }
-function handleModelName(key: string) {
-	settingStore.updateSetting({ modelName:key })
-	ms.success(`${t('model.modelAlert')}${settingStore.modelName}`)
 
+function handleModelName(key: string) {
+  settingStore.updateSetting({ modelName: key })
+  ms.success(`${t('model.modelAlert')}${settingStore.modelName}`)
 }
-// 可优化部分
-// 搜索选项计算，这里使用value作为索引项，所以当出现重复value时渲染异常(多项同时出现选中效果)
-// 理想状态下其实应该是key作为索引项,但官方的renderOption会出现问题，所以就需要value反renderLabel实现
+
 const searchOptions = computed(() => {
   if (prompt.value.startsWith('/')) {
     return promptTemplate.value.filter((item: { key: string }) => item.key.toLowerCase().includes(prompt.value.substring(1).toLowerCase())).map((obj: { value: any }) => {
@@ -182,7 +212,6 @@ const searchOptions = computed(() => {
   }
 })
 
-// value反渲染key
 const renderOption = (option: { label: string }) => {
   for (const i of promptTemplate.value) {
     if (i.value === option.label)
@@ -208,10 +237,21 @@ const footerClass = computed(() => {
   return classes
 })
 
-onMounted(() => {
+onMounted(async () => {
   scrollToBottom()
   if (inputRef.value && !isMobile.value)
     inputRef.value?.focus()
+
+  // 从 Home 页 createSession 跳转而来时，首轮 assistant 尚未回复，自动发起流式请求
+  const activeUuid = sessionStore.activeUuid
+  if (activeUuid == null || loading.value)
+    return
+  const session = sessionStore.getSessionByUuid(activeUuid)
+  if (!session?.context.length)
+    return
+  const lastTurn = session.context[session.context.length - 1]
+  if (lastTurn.assistant.text == null)
+    await streamTurn(activeUuid, lastTurn.turnIndex)
 })
 
 onUnmounted(() => {
@@ -231,16 +271,18 @@ onUnmounted(() => {
     <main class="flex-1 overflow-hidden">
       <div id="scrollRef" ref="scrollRef" class="h-full overflow-hidden overflow-y-auto">
         <div
+          id="image-wrapper"
           class="w-full max-w-screen-xl m-auto dark:bg-[#101014]"
           :class="[isMobile ? 'p-2' : 'p-4']"
         >
-<!--对话列表，对应着对话区-->
-              </div>
-							<div v-for="(turn,turnIndex) in sessionSource.context " :key="turnIndex">
-								<Bubble v-bind="turn.user" :turnIndex="turnIndex" ></Bubble>
-                <Bubble v-bind="turn.assistant" :turnIndex="turnIndex" ></Bubble>
-							</div>
-          </div>
+          <template v-if="sessionSource?.context">
+            <div v-for="(turn, turnIndex) in sessionSource.context" :key="turnIndex">
+              <Bubble v-bind="turn.user" :turn-index="turnIndex" />
+              <Bubble v-bind="turn.assistant" :turn-index="turnIndex" />
+            </div>
+          </template>
+        </div>
+      </div>
     </main>
     <footer :class="footerClass">
       <div class="w-full max-w-screen-xl m-auto">
@@ -255,31 +297,27 @@ onUnmounted(() => {
               <SvgIcon icon="ri:download-2-line" />
             </span>
           </HoverButton>
-<!--					是否使用对话上下文-->
           <HoverButton @click="toggleUsingContext">
             <span class="text-xl" :class="{ 'text-[#4b9e5f]': usingContext, 'text-[#a8071a]': !usingContext }">
-
               <SvgIcon icon="ri:chat-history-line" />
             </span>
           </HoverButton>
-					<n-dropdown
-						trigger="hover"
-						placement="top-start"
-						:show-arrow="true"
-						:options="modelList"
-						@select="handleModelName"
-						:value="settingStore.modelName"
+          <n-dropdown
+            trigger="hover"
+            placement="top-start"
+            :show-arrow="true"
+            :options="modelList"
+            :value="settingStore.modelName"
+            @select="handleModelName"
+          >
+            <HoverButton>
+              <span class="text-xl text-[#4f555e] dark:text-white">
+                <SvgIcon icon="carbon:model-alt" />
+              </span>
+            </HoverButton>
+          </n-dropdown>
 
-					>
-<!--						模型选择-->
-						<HoverButton >
-            <span class="text-xl text-[#4f555e] dark:text-white">
-							<SvgIcon icon="carbon:model-alt"></SvgIcon>
-            </span>
-						</HoverButton>
-					</n-dropdown>
-
-          <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption" >
+          <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption">
             <template #default="{ handleInput, handleBlur, handleFocus }">
               <NInput
                 ref="inputRef"
@@ -294,30 +332,28 @@ onUnmounted(() => {
               />
             </template>
           </NAutoComplete>
-          <NButton type="primary" :disabled="buttonDisabled" @click="handleSubmit" v-if="!loading">
-            <template #icon >
+          <NButton v-if="!loading" type="primary" :disabled="buttonDisabled" @click="handleSubmit">
+            <template #icon>
               <span class="dark:text-black">
-                <SvgIcon  icon="ri:send-plane-fill" />
+                <SvgIcon icon="ri:send-plane-fill" />
               </span>
             </template>
           </NButton>
 
-					<template v-else>
-						<n-tooltip trigger="hover"><template #trigger>
-						<NButton type="primary" :disabled="!buttonDisabled" @click="handleStop"  >
-							<template #icon>
-              <span class="dark:text-black">
-<!--								使用iconfy库-->
-                <SvgIcon icon="famicons:stop-circle" />
-              </span>
-							</template>
-						</NButton>
-					</template>
-							{{t('tooltip.stop')}}
-						</n-tooltip>
-					</template>
-
-
+          <template v-else>
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <NButton type="primary" :disabled="!buttonDisabled" @click="handleStop">
+                  <template #icon>
+                    <span class="dark:text-black">
+                      <SvgIcon icon="famicons:stop-circle" />
+                    </span>
+                  </template>
+                </NButton>
+              </template>
+              {{ t('tooltip.stop') }}
+            </n-tooltip>
+          </template>
         </div>
       </div>
     </footer>

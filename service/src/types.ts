@@ -1,35 +1,49 @@
-import type { FetchFn } from 'chatgpt'
+// ========== 以下为旧版 chatgpt 库类型，已废弃，保留备查 ==========
+// import type { FetchFn } from 'chatgpt'
+//
+// export interface RequestProps {
+//   prompt: string
+//   options?: ChatContext
+//   systemMessage: string
+//   temperature?: number
+//   top_p?: number
+//   model?: string
+// }
+//
+// export interface ChatContext {
+//   conversationId?: string
+//   parentMessageId?: string
+// }
+//
+// export interface ChatGPTUnofficialProxyAPIOptions {
+//   accessToken: string
+//   apiReverseProxyUrl?: string
+//   model?: string
+//   debug?: boolean
+//   headers?: Record<string, string>
+//   fetch?: FetchFn
+// }
+//
+// export interface ModelConfig {
+//   apiModel?: ApiModel
+//   reverseProxy?: string
+//   timeoutMs?: number
+//   socksProxy?: string
+//   httpsProxy?: string
+//   usage?: string
+// }
+//
+// export type ApiModel = 'ChatGPTAPI' | 'ChatGPTUnofficialProxyAPI' | undefined
 
-export interface RequestProps {
-  prompt: string
-  options?: ChatContext
-  systemMessage: string
+/** 新版 /chat-process 请求体，对齐 OpenAI Chat Completions */
+export interface ChatProcessBody {
+  model: string
+  messages: Array<{ role: string; content: string }>
   temperature?: number
   top_p?: number
-	model?:string
+  stream?: boolean
+  extra_body?: {
+    thinking?: { type: 'enabled' | 'disabled' }
+  }
+  reasoning_effort?: 'high' | 'max'
 }
-
-export interface ChatContext {
-  conversationId?: string
-  parentMessageId?: string
-}
-
-export interface ChatGPTUnofficialProxyAPIOptions {
-  accessToken: string
-  apiReverseProxyUrl?: string
-  model?: string
-  debug?: boolean
-  headers?: Record<string, string>
-  fetch?: FetchFn
-}
-
-export interface ModelConfig {
-  apiModel?: ApiModel
-  reverseProxy?: string
-  timeoutMs?: number
-  socksProxy?: string
-  httpsProxy?: string
-  usage?: string
-}
-
-export type ApiModel = 'ChatGPTAPI' | 'ChatGPTUnofficialProxyAPI' | undefined

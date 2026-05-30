@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { defaultState, getLocalState, setLocalState } from './helper'
 import { router } from '@/router'
 import { t } from '@/locales'
-import { log } from 'console'
+import { useSettingStore } from '@/store'
 
 const SESSION_TITLE_MAX_LENGTH = 20
 
@@ -17,6 +17,10 @@ function sessionTitleFromPrompt(prompt: string) {
 
 function findSessionIndex(sessions: Chat.Session[], uuid: number) {
   return sessions.findIndex(item => item.uuid === uuid)
+}
+
+function findTurn(session: Chat.Session, turnIndex: number) {
+  return session.context.find(item => item.turnIndex === turnIndex)
 }
 
 export const useSessionStore = defineStore('session-store', {
@@ -61,126 +65,171 @@ export const useSessionStore = defineStore('session-store', {
     },
 
     /** 新建会话（对应原版 addHistory） */
-    // TODO：禁止无限新建空会话，或者必须有Prompt才能建立会话
-   createSession(prompt:string) {
-    // TODO：UI层应该检查Prompt是否为空，禁止发送空消息
-    //清除占位消息
-    this.sessions = this.sessions.filter(s => !this.isEmptySession(s))
+    createSession(prompt: string) {
+      this.sessions = this.sessions.filter(s => !this.isEmptySession(s))
       const uuid = Date.now()
-      const context:Chat.ChatTurn[]=[{
-        turnIndex:0,
-        user:{
-          role:'user',
-          text:prompt,
-          dateTime:new Date().toISOString(),
+      const context: Chat.ChatTurn[] = [{
+        turnIndex: 0,
+        user: {
+          role: 'user',
+          text: prompt,
+          dateTime: new Date().toISOString(),
         },
-        assistant:{
-          role:'assistant',
-          text:null,
-          //TODO:存疑，可能依赖响应结束的时间
-          dateTime:new Date().toISOString(),
-        // 思考中
+        assistant: {
+          role: 'assistant',
+          text: null,
+          dateTime: new Date().toISOString(),
         },
       }]
       const newSession: Chat.Session = {
         uuid,
         title: sessionTitleFromPrompt(prompt),
         context,
-        createTime:new Date().toISOString(),
+        createTime: new Date().toISOString(),
       }
       this.sessions.unshift(newSession)
       this.activeUuid = uuid
       this.recordState()
-      // TODO：应该在Store里加载路由吗？
       this.reloadRoute(uuid)
     },
 
-		//TODO:发出Prompt（应该放在API层或者UI层）
-
-    /** 切换当前会话（对应原版 setActive） */
     async setActive(uuid: number) {
       this.activeUuid = uuid
       return await this.reloadRoute(uuid)
     },
 
-    getPrompt(uuid: number,turnIndex: number) {
+    getPrompt(uuid: number, turnIndex: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if(sessionIndex === -1)
-        {return}
+      if (sessionIndex === -1)
+        return
       const turn = this.sessions[sessionIndex].context.find(item => item.turnIndex === turnIndex)
-      if(turn)
-        {return turn.user.text}
+      if (turn)
+        return turn.user.text
       return null
     },
 
-    // 重试或更改prompt，绑定在重试按钮或消息的输入框里
-    retryTurn(uuid: number,turnIndex: number, text?: string) {
-      
+    retryTurn(uuid: number, turnIndex: number, text?: string) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
-      let currentPrompt:string|null=null
-      if(sessionIndex === -1)
-        {return}
-      const currentSession=this.sessions[sessionIndex]
-      if(text!==null&&text!==undefined&&text.trim()!=='') {
-        currentPrompt= text
-      }
-      else{
-        currentPrompt= this.getPrompt(uuid,turnIndex) as string
-      }
-      if(turnIndex>currentSession.context.length-1||turnIndex<0) {return}
-      const currentTurn=currentSession.context[turnIndex]
-      console.log(currentPrompt)
-      currentTurn.user.text=currentPrompt
-      currentTurn.assistant.text=null
-      // 从此处截断上下文
-      this.sliceContext(uuid,turnIndex)
+      let currentPrompt: string | null = null
+      if (sessionIndex === -1)
+        return
+      const currentSession = this.sessions[sessionIndex]
+      if (text !== null && text !== undefined && text.trim() !== '')
+        currentPrompt = text
+      else
+        currentPrompt = this.getPrompt(uuid, turnIndex) as string
+      if (turnIndex > currentSession.context.length - 1 || turnIndex < 0)
+        return
+      const currentTurn = currentSession.context[turnIndex]
+      currentTurn.user.text = currentPrompt
+      currentTurn.assistant.text = null
+      currentTurn.assistant.reasoning_content = undefined
+      currentTurn.assistant.error = undefined
+      this.sliceContext(uuid, turnIndex)
       this.recordState()
     },
+
     addTurn(uuid: number, text: string) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if(sessionIndex === -1)
-        {return}
-      const currentSession=this.sessions[sessionIndex]
-      const newTurn:Chat.ChatTurn={
-        turnIndex:currentSession.context.length,
-        user:{role:'user',text:text,dateTime:new Date().toISOString()},
-        assistant:{role:'assistant',text:null,dateTime:new Date().toISOString(),reasoning_content:"Thinking..."},
+      if (sessionIndex === -1)
+        return
+      const currentSession = this.sessions[sessionIndex]
+      const newTurn: Chat.ChatTurn = {
+        turnIndex: currentSession.context.length,
+        user: { role: 'user', text, dateTime: new Date().toISOString() },
+        assistant: {
+          role: 'assistant',
+          text: null,
+          dateTime: new Date().toISOString(),
+        },
       }
       currentSession.context.push(newTurn)
       this.recordState()
-  
     },
 
-    // TODO：待设计：减少类型断言
-    composeRequest(uuid: number,turnIndex: number):OpenAI.Message[] {
+    /**
+     * 流式追加 assistant 分片（由 SSE onChunk 调用）。
+     * 不在每次分片时 recordState，流结束后由 finishTurn 统一持久化。
+     */
+    appendAssistantDelta(
+      uuid: number,
+      turnIndex: number,
+      delta: OpenAI.StreamDelta,
+    ) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
-      if(sessionIndex === -1)
-        {return []}
-      const currentSession=this.sessions[sessionIndex]
-      // TODO：插入一条系统提示词
-      const request=[{role:'system',content:"You are a helpful LLM assistant."}]
-      for(let i=0;i<=turnIndex;i++) {
-        if(i<turnIndex) {
-          console.log(currentSession.context[i]);
-      const {user,assistant}=currentSession.context[i]
-      request.push({role:user.role,content:user.text as string })
-      request.push({role:assistant.role,content:assistant.text as string })
-      }
-      else{
-        const {user}=currentSession.context[i]
-        request.push({role:user.role,content:user.text as string })
-      }
-      }
-      // TODO:减少类型断言
-      return request as OpenAI.Message[]
+      if (sessionIndex === -1)
+        return
+      const turn = findTurn(this.sessions[sessionIndex], turnIndex)
+      if (!turn)
+        return
+
+      if (delta.reasoning_content)
+        turn.assistant.reasoning_content = (turn.assistant.reasoning_content ?? '') + delta.reasoning_content
+
+      if (delta.content)
+        turn.assistant.text = (turn.assistant.text ?? '') + delta.content
     },
+
+    /** 流式响应正常结束 */
+    finishTurn(uuid: number, turnIndex: number) {
+      const sessionIndex = findSessionIndex(this.sessions, uuid)
+      if (sessionIndex === -1)
+        return
+      const turn = findTurn(this.sessions[sessionIndex], turnIndex)
+      if (!turn)
+        return
+      turn.assistant.dateTime = new Date().toISOString()
+      this.recordState()
+    },
+
+    /** 流式响应失败 */
+    setTurnError(uuid: number, turnIndex: number, message: string) {
+      const sessionIndex = findSessionIndex(this.sessions, uuid)
+      if (sessionIndex === -1)
+        return
+      const turn = findTurn(this.sessions[sessionIndex], turnIndex)
+      if (!turn)
+        return
+      turn.assistant.error = true
+      turn.assistant.text = message
+      this.recordState()
+    },
+
+    /** 组装 OpenAI messages 数组，供 submitRequestBody 使用 */
+    composeRequest(uuid: number, turnIndex: number): OpenAI.Message[] {
+      const sessionIndex = findSessionIndex(this.sessions, uuid)
+      if (sessionIndex === -1)
+        return []
+      const currentSession = this.sessions[sessionIndex]
+      const settingStore = useSettingStore()
+      const request: OpenAI.Message[] = [{
+        role: 'system',
+        content: settingStore.systemMessage,
+      }]
+
+      for (let i = 0; i <= turnIndex; i++) {
+        const { user, assistant } = currentSession.context[i]
+        if (i < turnIndex) {
+          request.push({ role: user.role, content: user.text as string })
+          // 历史轮次：assistant 尚未回复完成则跳过
+          if (assistant.text)
+            request.push({ role: assistant.role, content: assistant.text })
+        }
+        else {
+          request.push({ role: user.role, content: user.text as string })
+        }
+      }
+      return request
+    },
+
     sliceContext(uuid: number, turnIndex: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
       if (sessionIndex !== -1) {
-        this.sessions[sessionIndex].context = this.sessions[sessionIndex].context.slice(0, turnIndex+1)
+        this.sessions[sessionIndex].context = this.sessions[sessionIndex].context.slice(0, turnIndex + 1)
         this.recordState()
       }
     },
+
     async deleteSession(uuid: number) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
       if (sessionIndex === -1)
@@ -204,7 +253,7 @@ export const useSessionStore = defineStore('session-store', {
 
       this.recordState()
     },
-    /** 清空全部会话（对应原版 clearHistory） */
+
     clearSessions() {
       this.$state = { ...defaultState() }
       this.recordState()
@@ -219,5 +268,3 @@ export const useSessionStore = defineStore('session-store', {
     },
   },
 })
-
-
