@@ -108,7 +108,8 @@ export const useSessionStore = defineStore('session-store', {
       return null
     },
 
-    retryTurn(uuid: number, turnIndex: number, text?: string) {
+    /** 更新指定轮次 prompt、清空 assistant 并截断后续上下文 */
+    updateContext(uuid: number, turnIndex: number, text?: string) {
       const sessionIndex = findSessionIndex(this.sessions, uuid)
       let currentPrompt: string | null = null
       if (sessionIndex === -1)

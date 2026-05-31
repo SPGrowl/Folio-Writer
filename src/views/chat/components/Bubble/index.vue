@@ -7,12 +7,12 @@ import { SvgIcon } from '@/components/common'
 import { t } from '@/locales'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { copyToClip } from '@/utils/copy'
-import { useSessionStore } from '@/store'
+
+
 interface Emit {
-  (ev: 'regenerate'): void
-  (ev: 'delete'): void
+  (ev: 'edit-submit', payload: { turnIndex: number, text: string }): void
+  (ev: 'retry', payload: { turnIndex: number }): void
 }
-// datetime未标准化
 interface Props {
 	role: 'user' | 'assistant'
 	dateTime: string
@@ -21,9 +21,7 @@ interface Props {
 	loading?: boolean
 	reasoning_content?: string 
   turnIndex: number
-   // 仅 assistant 时有意义
 }
-const sessionStore = useSessionStore()
 const props = defineProps<Props>()
 const isUser = computed(() => props.role === 'user')
 const emit = defineEmits<Emit>()
@@ -33,6 +31,10 @@ const loading = computed(() => {
     return false
   return props.text === null || props.text === '' || props.text === undefined
 })
+
+/** 助手回复已结束（非流式输出中）时才显示操作栏 */
+// TODO：语义存在问题，待修改
+const isFinished = computed(() => !isUser.value && !loading.value)
 
 const hasReasoning = computed(() => {
   return !isUser.value && !!props.reasoning_content?.trim()
@@ -45,6 +47,23 @@ const asRawText = ref(props.role === 'user')
 const editDraft = ref<string>(props.text as string)
 const isEditing = ref<boolean>(false)
 const showActions = ref<boolean>(false)
+
+/** UI 层：将 ISO 时间戳格式化为 YYYY-MM-DD HH:mm:ss */
+function formatDisplayDateTime(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime()))
+    return iso
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  const s = String(date.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${d} ${h}:${min}:${s}`
+}
+
+const displayDateTime = computed(() => formatDisplayDateTime(props.dateTime))
+
 async function handleCopy() {
   try {
     await copyToClip(props.text || '')
@@ -61,12 +80,14 @@ function updatePrompt() {
 
 function handleCancelEdit() {
   isEditing.value = false
-  editDraft.value = ''
 }
 function handleSubmitEdit() {
-  sessionStore.retryTurn(sessionStore.activeUuid as number, props.turnIndex, editDraft.value)
-  // TODO:发送请求，更新store
   isEditing.value = false
+  emit('edit-submit', { turnIndex: props.turnIndex, text: editDraft.value.trim() })
+}
+
+function handleRetry() {
+  emit('retry', { turnIndex: props.turnIndex })
 }
 </script>
 
@@ -83,7 +104,7 @@ function handleSubmitEdit() {
     </div>
     <div class="overflow-hidden text-sm" :class="[isUser ? 'items-end' : 'items-start']">
       <p class="text-xs text-[#b4bbc4]" :class="[isUser ? 'text-right' : 'text-left']">
-        {{ dateTime }}
+        {{ displayDateTime }}
       </p>
 
       <div
@@ -97,7 +118,8 @@ function handleSubmitEdit() {
           @click="reasoningExpanded = !reasoningExpanded"
         >
           <SvgIcon icon="mdi:atom" class="text-sm text-[#4b9e5f]" />
-          <span>{{ t('chat.thinking') }}</span>
+          <span v-if="loading">{{ t('chat.thinking') }}</span>
+          <span v-else>{{ t('chat.thinkingFinished') }}</span>
           <SvgIcon
             :icon="reasoningExpanded ? 'ri:arrow-up-s-line' : 'ri:arrow-down-s-line'"
             class="text-sm"
@@ -128,7 +150,7 @@ function handleSubmitEdit() {
             v-if="!isEditing"
             :inversion="isUser"
             :error="error"
-            :text="text??'Waiting for response...'"
+            :text="text??''"
             :loading="loading"
             :as-raw-text="asRawText"
           />
@@ -158,7 +180,7 @@ function handleSubmitEdit() {
             </template>
           </NInput>
 
-          <!-- 操作栏：气泡下方、右侧，固定高度占位 -->
+          <!-- 用户操作栏：气泡下方，悬停显示 -->
           <div
             v-if="isUser && !isEditing"
             class="message-actions flex h-6 min-h-6 w-full shrink-0 items-center justify-end"
@@ -184,6 +206,36 @@ function handleSubmitEdit() {
                 @click="handleCopy"
               >
                 <SvgIcon icon="ri:file-copy-2-line" class="text-base" />
+              </button>
+            </div>
+          </div>
+
+          <!-- 助手操作栏：回复结束后悬停显示，复制 + 重试 -->
+          <div
+            v-if="isFinished"
+            class="message-actions flex h-6 min-h-6 w-full shrink-0 items-center justify-start"
+          >
+            <div
+              class="flex items-center gap-0.5 transition-opacity duration-150"
+              :class="[
+                isMobile || showActions ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              ]"
+            >
+              <button
+                type="button"
+                class="p-1 transition text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                :title="t('chat.copy')"
+                @click="handleCopy"
+              >
+                <SvgIcon icon="ri:file-copy-2-line" class="text-base" />
+              </button>
+              <button
+                type="button"
+                class="p-1 transition text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                :title="t('bubble.retry')"
+                @click="handleRetry"
+              >
+                <SvgIcon icon="ri:restart-line" class="text-base" />
               </button>
             </div>
           </div>

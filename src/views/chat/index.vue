@@ -113,7 +113,7 @@ async function streamTurn(uuid: number, turnIndex: number) {
   }
 }
 
-async function handleSubmit() {
+async function handleAppend() {
   const activeUuid = sessionStore.activeUuid
   const text = prompt.value.trim()
   if (!activeUuid || !text || loading.value)
@@ -123,7 +123,27 @@ async function handleSubmit() {
   prompt.value = ''
 
   const turnIndex = (sessionStore.getSessionByUuid(activeUuid)?.context.length ?? 1) - 1
+  scrollToBottom()
   await streamTurn(activeUuid, turnIndex)
+}
+
+/** 更新上下文并重新流式请求指定轮次 */
+async function resendTurn(turnIndex: number, text?: string) {
+  const activeUuid = sessionStore.activeUuid
+  if (!activeUuid || loading.value)
+    return
+
+  sessionStore.updateContext(activeUuid, turnIndex, text)
+  scrollToBottom()
+  await streamTurn(activeUuid, turnIndex)
+}
+
+async function handleEditSubmit(turnIndex: number, text: string) {
+  await resendTurn(turnIndex, text)
+}
+
+async function handleRetry(turnIndex: number) {
+  await resendTurn(turnIndex)
 }
 
 function handleExport() {
@@ -175,13 +195,13 @@ function handleEnter(event: KeyboardEvent) {
   if (!isMobile.value) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-      handleSubmit()
+      handleAppend()
     }
   }
   else {
     if (event.key === 'Enter' && event.ctrlKey) {
       event.preventDefault()
-      handleSubmit()
+      handleAppend()
     }
   }
 }
@@ -277,8 +297,16 @@ onUnmounted(() => {
         >
           <template v-if="sessionSource?.context">
             <div v-for="(turn, turnIndex) in sessionSource.context" :key="turnIndex">
-              <Bubble v-bind="turn.user" :turn-index="turnIndex" />
-              <Bubble v-bind="turn.assistant" :turn-index="turnIndex" />
+              <Bubble
+                v-bind="turn.user"
+                :turn-index="turnIndex"
+                @edit-submit="handleEditSubmit($event.turnIndex, $event.text)"
+              />
+              <Bubble
+                v-bind="turn.assistant"
+                :turn-index="turnIndex"
+                @retry="handleRetry($event.turnIndex)"
+              />
             </div>
           </template>
         </div>
@@ -287,21 +315,21 @@ onUnmounted(() => {
     <footer :class="footerClass">
       <div class="w-full max-w-screen-xl m-auto">
         <div class="flex items-center justify-between space-x-2">
-          <HoverButton v-if="!isMobile" @click="handleClear">
+          <!-- <HoverButton v-if="!isMobile" @click="handleDelete(sessionSource?.uuid as number)">
             <span class="text-xl text-[#4f555e] dark:text-white">
               <SvgIcon icon="ri:delete-bin-line" />
             </span>
-          </HoverButton>
+          </HoverButton> -->
           <HoverButton v-if="!isMobile" @click="handleExport">
             <span class="text-xl text-[#4f555e] dark:text-white">
               <SvgIcon icon="ri:download-2-line" />
             </span>
           </HoverButton>
-          <HoverButton @click="toggleUsingContext">
+          <!-- <HoverButton @click="toggleUsingContext">
             <span class="text-xl" :class="{ 'text-[#4b9e5f]': usingContext, 'text-[#a8071a]': !usingContext }">
               <SvgIcon icon="ri:chat-history-line" />
             </span>
-          </HoverButton>
+          </HoverButton> -->
           <n-dropdown
             trigger="hover"
             placement="top-start"
@@ -332,7 +360,7 @@ onUnmounted(() => {
               />
             </template>
           </NAutoComplete>
-          <NButton v-if="!loading" type="primary" :disabled="buttonDisabled" @click="handleSubmit">
+          <NButton v-if="!loading" type="primary" :disabled="buttonDisabled" @click="handleAppend">
             <template #icon>
               <span class="dark:text-black">
                 <SvgIcon icon="ri:send-plane-fill" />

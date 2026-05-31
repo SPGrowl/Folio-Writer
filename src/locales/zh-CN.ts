@@ -56,6 +56,7 @@ export default {
     preview: '预览',
     showRawText: '显示原文',
     thinking: '思考中...',
+    thinkingFinished: '已思考',
   },
 	tooltip:{
 		stop: '停止响应',
@@ -69,6 +70,7 @@ export default {
 	bubble:{
 		cancel: '取消',
 		send: '发送',
+		retry: '重试',
 	},
 
   setting: {
