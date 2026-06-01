@@ -80,6 +80,8 @@ pnpm dev
 
 ```
 chatgpt-web/
+├── docs/
+│   └── images/                 # README 演示截图
 ├── src/
 │   ├── api/                      # 接口与流式请求入口
 │   ├── store/modules/session/    # 会话状态（Session / Turn）
@@ -100,7 +102,59 @@ chatgpt-web/
 
 ## 功能展示
 
+截图位于 [`docs/images/`](./docs/images/)，远程仓库可直接预览。
 
+### Home 起始页
+
+独立欢迎页与输入区，创建会话后自动跳转并发起首轮流式请求。
+
+<p align="center">
+  <img src="./docs/images/home.png" width="880" alt="Home 起始页" />
+</p>
+
+### 思考过程与 Markdown 渲染
+
+流式展示 `reasoning_content`（可折叠「已思考」），正文支持 Markdown 与代码块。
+
+<p align="center">
+  <img src="./docs/images/chat-reasoning.png" width="880" alt="思考过程与对话" />
+</p>
+
+
+<p align="center">
+  <img src="./docs/images/chat-markdown-table.png" width="880" alt="Markdown 表格渲染" />
+</p>
+
+### 多轮对话
+
+同一会话内多轮上下文连贯，侧栏标题取自首轮 Prompt。
+
+<p align="center">
+  <img src="./docs/images/chat-multi-turn.png" width="880" alt="多轮对话" />
+</p>
+
+### 用户消息编辑重发
+
+悬停用户气泡可编辑 Prompt，发送后截断后续上下文并重新流式请求。
+
+<p align="center">
+  <img src="./docs/images/chat-edit-prompt.png" width="880" alt="编辑 Prompt 重发" />
+</p>
+
+### 多会话管理
+
+侧栏按 UUID 管理会话，支持重命名、删除与切换。
+
+<p align="center">
+  <img src="./docs/images/chat-sessions.png" width="880" alt="多会话侧栏" />
+</p>
+
+## 待修复的问题
+1.流式输出时仍然可以点击重试按钮或者更改Prompt。
+2.未对请求失败的边界情况进行处理和自动重试
+3.缺少思考时的样式
+4.缺少测试和代码审查
+5.只支持文本这种单一模态
 ## 后续增强计划
 
 按优先级排列，供二期及以后迭代参考。
@@ -111,7 +165,6 @@ chatgpt-web/
 - [ ] **输入框体验**：长文本 autosize 优化、Home / Chat 输入组件进一步统一
 - [ ] **停止生成状态**：Abort 后标记「已停止」，避免半句回复语义不清
 - [ ] **清理遗留代码**：移除已注释的 chatgpt 库逻辑与无效 UI 入口
-
 ### 中期（架构增强）
 
 - [ ] **按会话维度的 streaming 状态**：`Map<uuid, AbortController>`，支持 A 会话生成时 B 会话仍可对话
