@@ -6,6 +6,7 @@ import Sider from './sider/index.vue'
 import Permission from './Permission.vue'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { useAppStore, useAuthStore, useChatStore } from '@/store'
+import ComposePlaceholder from '@/views/chat/compose/index.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,6 +31,7 @@ watch(
 const { isMobile } = useBasicLayout()
 
 const collapsed = computed(() => appStore.siderCollapsed)
+const isComposeMode = computed(() => appStore.siderMode === 'compose')
 
 const needPermission = computed(() => !!authStore.session?.auth && !authStore.token)
 
@@ -53,7 +55,8 @@ const getContainerClass = computed(() => {
       <NLayout class="z-40 transition" :class="getContainerClass" has-sider>
         <Sider />
         <NLayoutContent class="h-full">
-          <RouterView v-slot="{ Component, route }">
+          <ComposePlaceholder v-if="isComposeMode" />
+          <RouterView v-else v-slot="{ Component, route }">
             <component :is="Component" :key="route.fullPath" />
           </RouterView>
         </NLayoutContent>

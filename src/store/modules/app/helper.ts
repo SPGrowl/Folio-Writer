@@ -23,15 +23,18 @@ const languageMap: { [key: string]: Language } = {
   'zh-TW': 'zh-TW',
 }
 
+export type SiderMode = 'chat' | 'compose'
+
 export interface AppState {
   siderCollapsed: boolean
+  siderMode: SiderMode
   theme: Theme
   language: Language
   liteMode:boolean
 }
 export function defaultSetting(): AppState {
   const language = languageMap[navigator.language]
-  return { siderCollapsed: false, theme: 'light', language ,liteMode:false}
+  return { siderCollapsed: false, siderMode: 'chat', theme: 'light', language ,liteMode:false}
 }
 
 export function getLocalSetting(): AppState {

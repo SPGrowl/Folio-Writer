@@ -24,26 +24,12 @@ app.all('*', (_, res, next) => {
 
 /** 新版流式对话：接收 OpenAI 标准请求体，SSE 透传分片 */
 router.post('/chat-process', [auth, limiter], async (req, res) => {
+  // 设置响应头，告知前端这是SSE流式响应，按照SSE格式解析响应体
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   res.setHeader('Cache-Control', 'no-cache, no-transform')
   res.setHeader('Connection', 'keep-alive')
 
-  // ========== 旧版 chatgpt 流式协议，已废弃 ==========
-  // res.setHeader('Content-type', 'application/octet-stream')
-  // const { prompt, options = {}, systemMessage, temperature, top_p, model } = req.body as RequestProps
-  // let firstChunk = true
-  // await chatReplyProcess({
-  //   message: prompt,
-  //   lastContext: options,
-  //   process: (chat: ChatMessage) => {
-  //     res.write(firstChunk ? JSON.stringify(chat) : `\n${JSON.stringify(chat)}`)
-  //     firstChunk = false
-  //   },
-  //   systemMessage,
-  //   temperature,
-  //   top_p,
-  //   model,
-  // })
+
 
   try {
     const {

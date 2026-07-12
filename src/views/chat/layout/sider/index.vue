@@ -3,11 +3,13 @@ import type { CSSProperties } from 'vue'
 import { computed, ref, watch } from 'vue'
 import { NButton, NLayoutSider, useDialog } from 'naive-ui'
 import List from './List.vue'
+import ComposeList from './ComposeList.vue'
 import Footer from './Footer.vue'
 import { useAppStore, useChatStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { PromptStore, SvgIcon } from '@/components/common'
 import { t } from '@/locales'
+import type { SiderMode } from '@/store/modules/app/helper'
 
 const appStore = useAppStore()
 const chatStore = useChatStore()
@@ -18,11 +20,23 @@ const { isMobile } = useBasicLayout()
 const show = ref(false)
 
 const collapsed = computed(() => appStore.siderCollapsed)
+const siderMode = computed(() => appStore.siderMode)
+const isChatMode = computed(() => siderMode.value === 'chat')
 
 async function handleAdd() {
   await chatStore.goHome()
   if (isMobile.value)
     appStore.setSiderCollapsed(true)
+}
+
+function handleAddText() {
+  // 占位：后续接入创作功能
+  if (isMobile.value)
+    appStore.setSiderCollapsed(true)
+}
+
+function handleSwitchMode(mode: SiderMode) {
+  appStore.setSiderMode(mode)
 }
 
 function handleUpdateCollapsed() {
@@ -87,22 +101,42 @@ watch(
     @update-collapsed="handleUpdateCollapsed"
   >
     <div class="flex flex-col h-full" :style="mobileSafeArea">
+      <div class="flex border-b dark:border-neutral-800">
+        <button
+          class="flex-1 py-3 text-sm"
+          :class="isChatMode ? 'font-medium border-b-2 border-[#4b9e5f] text-[#4b9e5f]' : 'text-neutral-500'"
+          @click="handleSwitchMode('chat')"
+        >
+          {{ $t('sider.chatTab') }}
+        </button>
+        <button
+          class="flex-1 py-3 text-sm"
+          :class="!isChatMode ? 'font-medium border-b-2 border-[#4b9e5f] text-[#4b9e5f]' : 'text-neutral-500'"
+          @click="handleSwitchMode('compose')"
+        >
+          {{ $t('sider.composeTab') }}
+        </button>
+      </div>
       <main class="flex flex-col flex-1 min-h-0">
         <div class="p-4">
-          <NButton dashed block @click="handleAdd" >
+          <NButton v-if="isChatMode" dashed block @click="handleAdd">
             {{ $t('chat.newChatButton') }}
+          </NButton>
+          <NButton v-else dashed block @click="handleAddText">
+            {{ $t('compose.newTextButton') }}
           </NButton>
         </div>
         <div class="flex-1 min-h-0 pb-4 overflow-hidden">
-          <List />
+          <List v-if="isChatMode" />
+          <ComposeList v-else />
         </div>
-        <div class="flex items-center p-4 space-x-4">
+        <div v-if="isChatMode" class="flex items-center p-4 space-x-4">
           <div class="flex-1">
-            <NButton block @click="show = true" v-if="!appStore.liteMode">
+            <NButton v-if="!appStore.liteMode" block @click="show = true">
               {{ $t('store.siderButton') }}
             </NButton>
           </div>
-          <NButton @click="handleClearAll"  v-if="!appStore.liteMode">
+          <NButton v-if="!appStore.liteMode" @click="handleClearAll">
             <SvgIcon icon="ri:close-circle-line" />
           </NButton>
         </div>
@@ -114,6 +148,5 @@ watch(
     <div v-show="!collapsed" class="fixed inset-0 z-40 w-full h-full bg-black/40" @click="handleUpdateCollapsed" />
   </template>
 
-	<PromptStore  v-model:visible="show"  />
-
+  <PromptStore v-model:visible="show" />
 </template>

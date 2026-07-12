@@ -55,6 +55,14 @@ export default {
     showRawText: 'Show as raw text',
     thinking: 'Thinking...',
   },
+  sider: {
+    chatTab: 'Chat',
+    composeTab: 'Compose',
+  },
+  compose: {
+    newTextButton: 'New Text',
+    placeholder: 'Select a text to start composing, or create a new one',
+  },
   setting: {
     setting: 'Setting',
     general: 'General',

@@ -83,6 +83,7 @@ const modelList: DropdownOption[] = [
 /** 对指定轮次发起 SSE 流式请求，增量更新 sessionStore */
 async function streamTurn(uuid: number, turnIndex: number) {
   loading.value = true
+  // 终止请求
   controller = new AbortController()
 
   const messages = sessionStore.composeRequest(uuid, turnIndex)

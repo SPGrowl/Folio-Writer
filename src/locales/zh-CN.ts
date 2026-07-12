@@ -58,6 +58,14 @@ export default {
     thinking: '思考中...',
     thinkingFinished: '已思考',
   },
+  sider: {
+    chatTab: '对话',
+    composeTab: '创作',
+  },
+  compose: {
+    newTextButton: '新建文本',
+    placeholder: '选择一个文本开始创作，或新建文本',
+  },
 	tooltip:{
 		stop: '停止响应',
 	},

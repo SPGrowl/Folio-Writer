@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { AppState, Language, Theme } from './helper'
+import type { AppState, Language, SiderMode, Theme } from './helper'
 import { getLocalSetting, setLocalSetting } from './helper'
 import { store } from '@/store/helper'
 
@@ -8,6 +8,11 @@ export const useAppStore = defineStore('app-store', {
   actions: {
     setSiderCollapsed(collapsed: boolean) {
       this.siderCollapsed = collapsed
+      this.recordState()
+    },
+
+    setSiderMode(mode: SiderMode) {
+      this.siderMode = mode
       this.recordState()
     },
 
