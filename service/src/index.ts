@@ -6,6 +6,7 @@ import express from 'express'
 import { testConnection } from './db/pool'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
+import { registerArticleRoutes } from './routes/articles'
 import { registerMessageRoutes } from './routes/messages'
 import { isNotEmptyString } from './utils/is'
 import { streamChatCompletion } from './oepnai/stream'
@@ -101,6 +102,7 @@ router.post('/verify', async (req, res) => {
 })
 
 registerMessageRoutes(router)
+registerArticleRoutes(router)
 
 app.use('', router)
 app.use('/api', router)
