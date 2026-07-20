@@ -3,8 +3,10 @@ import express from 'express'
 // import type { RequestProps } from './types'
 // import type { ChatMessage } from './chatgpt'
 // import { chatConfig, chatReplyProcess, currentModel } from './chatgpt'
+import { testConnection } from './db/pool'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
+import { registerMessageRoutes } from './routes/messages'
 import { isNotEmptyString } from './utils/is'
 import { streamChatCompletion } from './oepnai/stream'
 import { currentModel } from './oepnai/index'
@@ -98,8 +100,20 @@ router.post('/verify', async (req, res) => {
   }
 })
 
+registerMessageRoutes(router)
+
 app.use('', router)
 app.use('/api', router)
 app.set('trust proxy', 1)
 
-app.listen(3002, () => globalThis.console.log('Server is running on port 3002'))
+
+app.listen(3002, async () => {
+  globalThis.console.log('Server is running on port 3002')
+  try {
+    await testConnection()
+    globalThis.console.log('PostgreSQL connected')
+  }
+  catch (error: any) {
+    globalThis.console.warn(`PostgreSQL unavailable: ${error.message}`)
+  }
+})

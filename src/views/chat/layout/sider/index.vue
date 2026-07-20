@@ -127,6 +127,7 @@ watch(
           </NButton>
         </div>
         <div class="flex-1 min-h-0 pb-4 overflow-hidden">
+          <!-- 区分聊天模式和创作模式 -->
           <List v-if="isChatMode" />
           <ComposeList v-else />
         </div>
