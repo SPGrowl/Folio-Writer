@@ -4,6 +4,7 @@ import express from 'express'
 // import type { ChatMessage } from './chatgpt'
 // import { chatConfig, chatReplyProcess, currentModel } from './chatgpt'
 import { testConnection } from './db/pool'
+import { testPrismaConnection } from './db/prisma'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
 import { registerArticleRoutes } from './routes/articles'
@@ -113,7 +114,8 @@ app.listen(3002, async () => {
   globalThis.console.log('Server is running on port 3002')
   try {
     await testConnection()
-    globalThis.console.log('PostgreSQL connected')
+    await testPrismaConnection()
+    globalThis.console.log('PostgreSQL connected (pg + Prisma)')
   }
   catch (error: any) {
     globalThis.console.warn(`PostgreSQL unavailable: ${error.message}`)

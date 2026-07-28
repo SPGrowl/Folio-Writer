@@ -7,9 +7,8 @@ export function setupPageGuard(router: Router) {
 // 判断会话数据是否有效
     if (!authStore.session) {
       try {
-        // 获取会话数据
         const data = await authStore.getSession()
-        if (String(data.auth) === 'false' && authStore.token)
+        if (data && String(data.auth) === 'false' && authStore.token)
           authStore.removeToken()
         if (to.path === '/500')
           next({ name: 'Root' })

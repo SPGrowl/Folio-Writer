@@ -6,7 +6,10 @@
 --   articles.id            -> Compose.Article.id          (number, BIGSERIAL)
 --   articles.title         -> Compose.Article.title
 --   articles.content       -> Compose.Article.content
---   articles.linked_group  -> Compose.Article.linkedGroup (string)
+--   articles.linked_group  -> Compose.Article.linkedGroup (string, UUID)
+--   article_groups.id      -> 分组唯一标识
+--   article_groups.name    -> 分组名称
+--   article_groups.article_ids -> 本组包含的文章 id 列表
 --   articles.created_at    -> Compose.Article.createdAt
 --   articles.updated_at    -> Compose.Article.updatedAt
 --   article_history.id     -> Compose.history.id          (string, UUID，接口层转字符串)
@@ -39,6 +42,20 @@ CREATE INDEX IF NOT EXISTS idx_articles_updated
 
 CREATE INDEX IF NOT EXISTS idx_articles_linked_group
   ON articles (linked_group);
+
+-- ---------------------------------------------------------------------------
+-- 文章分组表：每组有唯一 UUID、名称及所含文章 ID 列表
+--   article_groups.id           -> 分组唯一标识（articles.linked_group 引用）
+--   article_groups.name         -> 分组名称
+--   article_groups.article_ids  -> 本组包含的文章 id 数组
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS article_groups (
+  id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         VARCHAR(256) NOT NULL DEFAULT '未命名分组',
+  article_ids  BIGINT[]     NOT NULL DEFAULT '{}',
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
 
 -- ---------------------------------------------------------------------------
 -- 文章历史表：对应 Compose.history[]，一条历史一行

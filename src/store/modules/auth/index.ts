@@ -29,17 +29,12 @@ export const useAuthStore = defineStore('auth-store', {
   actions: {
     // 获取会话数据
     async getSession() {
-      try {
-        // 从后端获取会话信息
-        const { data } = await fetchSession<SessionResponse>()
-        // 将会话信息存入store
-        this.session = { ...data }
-        // 等价于: return data,存入后返回data
-        return Promise.resolve(data)
-      }
-      catch (error) {
-        return Promise.reject(error)
-      }
+      const res = await fetchSession<SessionResponse>()
+      if (!res?.data)
+        return Promise.reject(new Error(res?.message ?? 'Session data is empty'))
+
+      this.session = { ...res.data }
+      return res.data
     },
 
     setToken(token: string) {

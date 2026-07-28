@@ -20,6 +20,7 @@ export default {
     no: 'No',
     confirm: 'Confirm',
     download: 'Download',
+    loading: 'Loading',
     noData: 'No Data',
     wrong: 'Something went wrong, please try again later.',
     success: 'Success',
@@ -62,6 +63,7 @@ export default {
   compose: {
     newTextButton: 'New Text',
     placeholder: 'Select a text to start composing, or create a new one',
+    deleteArticleConfirm: 'Are you sure to delete this text?',
   },
   setting: {
     setting: 'Setting',

@@ -1,5 +1,6 @@
 export * from './app'
 export * from './chat'
+export * from './compose'
 export * from './session'
 export * from './user'
 export * from './prompt'

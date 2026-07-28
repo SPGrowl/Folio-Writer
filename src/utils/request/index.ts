@@ -1,86 +1,45 @@
-import type { AxiosProgressEvent, AxiosResponse, GenericAbortSignal } from 'axios'
-import request from './axios'
-import { useAuthStore } from '@/store'
+import type { AxiosRequestConfig, GenericAbortSignal } from 'axios'
+import service from './axios'
+import type { ApiResponse } from './axios'
 
-export interface HttpOption {
-  url: string
-  data?: any
-  method?: string
-  headers?: any
-  onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void
+/** 除 url/method/params/data 外的 axios 配置 */
+type RequestConfig = Omit<
+  AxiosRequestConfig,
+  'url' | 'method' | 'params' | 'data'
+> & {
   signal?: GenericAbortSignal
-  beforeRequest?: () => void
-  afterRequest?: () => void
 }
 
-export interface Response<T = any> {
-  data: T
-  message: string | null
-  status: string
+export type { ApiResponse }
+export { ApiError } from './axios'
+
+export function get<T>(
+  url: string,
+  params?: Record<string, unknown>,
+  config?: RequestConfig,
+): Promise<ApiResponse<T>> {
+  return service.get<unknown, ApiResponse<T>>(url, { params, ...config })
 }
 
-function http<T = any>(
-  { url, data, method, headers, onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
-) {
-  const successHandler = (res: AxiosResponse<Response<T>>) => {
-    const authStore = useAuthStore()
-
-    // 如果响应状态为成功，且响应数据位字符串，则直接返回响应数据
-    if (res.data.status === 'Success' || typeof res.data === 'string')
-      return res.data
-
-    if (res.data.status === 'Unauthorized') {
-      authStore.removeToken()
-      window.location.reload()
-    }
-
-    return Promise.reject(res.data)
-  }
-
-  const failHandler = (error: Response<Error>) => {
-    afterRequest?.()
-    throw new Error(error?.message || 'Error')
-  }
-
-  beforeRequest?.()
-
-  method = method || 'GET'
-
-  const params = Object.assign(typeof data === 'function' ? data() : data ?? {}, {})
-
-  return method === 'GET'
-    ? request.get(url, { params, signal, onDownloadProgress }).then(successHandler, failHandler)
-    : request.post(url, params, { headers, signal, onDownloadProgress }).then(successHandler, failHandler)
+export function post<T>(
+  url: string,
+  data?: unknown,
+  config?: RequestConfig,
+): Promise<ApiResponse<T>> {
+  return service.post<unknown, ApiResponse<T>>(url, data, config)
 }
 
-export function get<T = any>(
-  { url, data, method = 'GET', onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
-): Promise<Response<T>> {
-  return http<T>({
-    url,
-    method,
-    data,
-    onDownloadProgress,
-    signal,
-    beforeRequest,
-    afterRequest,
-  })
+export function put<T>(
+  url: string,
+  data?: unknown,
+  config?: RequestConfig,
+): Promise<ApiResponse<T>> {
+  return service.put<unknown, ApiResponse<T>>(url, data, config)
 }
 
-export function post<T = any>(
-  { url, data, method = 'POST', headers, onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
-): Promise<Response<T>> {
-  return http<T>({
-    url,
-    // 指定发送post请求
-    method,
-    data,
-    headers,
-    onDownloadProgress,
-    signal,
-    beforeRequest,
-    afterRequest,
-  })
+export function del<T>(
+  url: string,
+  config?: RequestConfig,
+): Promise<ApiResponse<T>> {
+  return service.delete<unknown, ApiResponse<T>>(url, config)
 }
-
-export default post

@@ -1,28 +1,12 @@
-import type { PoolClient } from 'pg'
-import { pool } from './pool'
-
-/** 数据库 articles 表一行（列名与 PostgreSQL 一致，蛇形命名） */
-export interface ArticleRow {
-  id: number
-  title: string
-  content: string
-  created_at: Date
-  updated_at: Date
-}
-
-/** 数据库 article_history 表一行 */
-export interface ArticleHistoryRow {
-  id: number
-  article_id: number
-  content: string
-  insert_time: Date
-}
+import { prisma } from './prisma'
+import { addArticleToGroup, removeArticleFromGroup } from './articleGroups'
 
 /** 与前端 Compose.Article 对齐的返回结构（驼峰命名） */
 export interface ArticleDto {
   id: number
   title: string
   content: string
+  linkedGroup: string
   createdAt: string
   updatedAt: string
   history: Array<{
@@ -36,7 +20,10 @@ export interface CreateArticleInput {
   /** 可选：指定主键；不传则由数据库 BIGSERIAL 自增 */
   id?: number
   title?: string
+  /** 必填：文章正文 */
   content: string
+  /** 必填：所属文章组的 UUID */
+  linkedGroupId: string
 }
 
 /** 更新文章时的入参 */
@@ -46,21 +33,33 @@ export interface UpdateArticleInput {
   content: string
 }
 
-/** 把数据库时间转成 ISO 字符串，供 JSON 返回给前端 */
-function toIsoString(value: Date): string {
-  return value.toISOString()
+/** Prisma 查询 article + history 的返回形状 */
+interface ArticleWithHistory {
+  id: bigint
+  title: string
+  content: string
+  linkedGroup: string
+  createdAt: Date
+  updatedAt: Date
+  history: Array<{
+    insertTime: Date
+    content: string
+  }>
 }
 
-/** 把 articles 行 + 历史记录拼成前端需要的 Article 对象 */
-function toArticleDto(row: ArticleRow, historyRows: ArticleHistoryRow[]): ArticleDto {
+const historyOrder = { insertTime: 'desc' as const }
+
+/** 把 Prisma 模型转成前端需要的 Article 对象（BigInt → number） */
+function toArticleDto(article: ArticleWithHistory): ArticleDto {
   return {
-    id: row.id,
-    title: row.title,
-    content: row.content,
-    createdAt: toIsoString(row.created_at),
-    updatedAt: toIsoString(row.updated_at),
-    history: historyRows.map(h => ({
-      insertTime: toIsoString(h.insert_time),
+    id: Number(article.id),
+    title: article.title,
+    content: article.content,
+    linkedGroup: article.linkedGroup,
+    createdAt: article.createdAt.toISOString(),
+    updatedAt: article.updatedAt.toISOString(),
+    history: article.history.map(h => ({
+      insertTime: h.insertTime.toISOString(),
       content: h.content,
     })),
   }
@@ -69,173 +68,127 @@ function toArticleDto(row: ArticleRow, historyRows: ArticleHistoryRow[]): Articl
 /**
  * 查：拉取全部未删除文章，并附带各自的历史版本列表。
  * 历史按 insert_time 倒序（最新的在前）。
+ *
+ * Prisma 等价于：
+ *   findMany({ where: { deletedAt: null }, include: { history } })
+ * 替代原先两次 SQL + Map 分组的手动组装。
  */
 export async function listArticles(): Promise<ArticleDto[]> {
-  // 只查 deleted_at 为 NULL 的，表示未被软删除
-  const articlesResult = await pool.query<ArticleRow>(
-    `SELECT id, title, content, created_at, updated_at
-     FROM articles
-     WHERE deleted_at IS NULL
-     ORDER BY updated_at DESC`,
-  )
+  const articles = await prisma.article.findMany({
+    where: { deletedAt: null },
+    orderBy: { updatedAt: 'desc' },
+    include: {
+      history: { orderBy: historyOrder },
+    },
+  })
 
-  if (articlesResult.rows.length === 0)
-    return []
-
-  const articleIds = articlesResult.rows.map(row => row.id)
-
-  // 用 ANY($1) 一次查出这些文章的全部历史；$1 是 PostgreSQL 的数组占位符
-  const historyResult = await pool.query<ArticleHistoryRow>(
-    `SELECT id, article_id, content, insert_time
-     FROM article_history
-     WHERE article_id = ANY($1::bigint[])
-     ORDER BY article_id, insert_time DESC`,
-    [articleIds],
-  )
-
-  // 按 article_id 分组，方便后面组装
-  const historyByArticleId = new Map<number, ArticleHistoryRow[]>()
-  for (const row of historyResult.rows) {
-    const list = historyByArticleId.get(row.article_id) ?? []
-    list.push(row)
-    historyByArticleId.set(row.article_id, list)
-  }
-
-  return articlesResult.rows.map(row =>
-    toArticleDto(row, historyByArticleId.get(row.id) ?? []),
-  )
+  return articles.map(toArticleDto)
 }
 
 /**
  * 增：插入一篇新文章，并把初始正文写入历史表（首条快照）。
- * - content 必填
- * - title 可选，默认「未命名文章」
- * - id 可选；若传入则使用该主键（需不与已有记录冲突）
+ * 须传入 content 与 linkedGroupId，并将文章加入对应分组。
  */
 export async function createArticle(input: CreateArticleInput): Promise<ArticleDto> {
-  const client: PoolClient = await pool.connect()
   const title = input.title?.trim() || '未命名文章'
   const content = input.content ?? ''
+  const linkedGroupId = input.linkedGroupId?.trim()
 
-  try {
-    await client.query('BEGIN')
+  if (!linkedGroupId)
+    throw new Error('linkedGroupId 必填')
 
-    let inserted: ArticleRow
+  const article = await prisma.$transaction(async (tx) => {
+    const group = await tx.articleGroup.findUnique({
+      where: { id: linkedGroupId },
+    })
 
-    if (input.id != null) {
-      const result = await client.query<ArticleRow>(
-        `INSERT INTO articles (id, title, content)
-         VALUES ($1, $2, $3)
-         RETURNING id, title, content, created_at, updated_at`,
-        [input.id, title, content],
-      )
-      inserted = result.rows[0]
-    }
-    else {
-      const result = await client.query<ArticleRow>(
-        `INSERT INTO articles (title, content)
-         VALUES ($1, $2)
-         RETURNING id, title, content, created_at, updated_at`,
-        [title, content],
-      )
-      inserted = result.rows[0]
-    }
+    if (!group)
+      throw new Error('文章组不存在')
 
-    // 新增时把初始全量正文推入历史
-    const history = await client.query<ArticleHistoryRow>(
-      `INSERT INTO article_history (article_id, content)
-       VALUES ($1, $2)
-       RETURNING id, article_id, content, insert_time`,
-      [inserted.id, content],
-    )
+    const created = await tx.article.create({
+      data: {
+        ...(input.id != null ? { id: BigInt(input.id) } : {}),
+        title,
+        content,
+        linkedGroup: linkedGroupId,
+        history: {
+          create: { content },
+        },
+      },
+      include: {
+        history: { orderBy: historyOrder },
+      },
+    })
 
-    await client.query('COMMIT')
-    return toArticleDto(inserted, history.rows)
-  }
-  catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  }
-  finally {
-    client.release()
-  }
+    await addArticleToGroup(tx, linkedGroupId, created.id)
+
+    return created
+  })
+
+  return toArticleDto(article)
 }
 
 /**
  * 改：按 id 更新文章正文（及可选标题）。
  * 更新完成后，把「本次更新后的全量正文」写入 article_history。
+ *
+ * Prisma 等价于：
+ *   $transaction → findFirst → update → history.create → findMany
+ * 事务内保证「读-改-写历史」原子性，替代 FOR UPDATE + 多条 SQL。
  */
 export async function updateArticle(input: UpdateArticleInput): Promise<ArticleDto | null> {
-  const client: PoolClient = await pool.connect()
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.article.findFirst({
+      where: { id: BigInt(input.id), deletedAt: null },
+    })
 
-  try {
-    await client.query('BEGIN')
-
-    const current = await client.query<ArticleRow>(
-      `SELECT id, title, content, created_at, updated_at
-       FROM articles
-       WHERE id = $1 AND deleted_at IS NULL
-       FOR UPDATE`,
-      [input.id],
-    )
-
-    const row = current.rows[0]
-    if (!row) {
-      await client.query('ROLLBACK')
+    if (!current)
       return null
-    }
 
-    const title = input.title?.trim() || row.title
+    const title = input.title?.trim() || current.title
     const content = input.content
 
-    const updated = await client.query<ArticleRow>(
-      `UPDATE articles
-       SET title = $2,
-           content = $3,
-           updated_at = now()
-       WHERE id = $1
-       RETURNING id, title, content, created_at, updated_at`,
-      [input.id, title, content],
-    )
+    const updated = await tx.article.update({
+      where: { id: BigInt(input.id) },
+      data: { title, content },
+    })
 
-    // 把更新后的全量正文推入历史表
-    await client.query(
-      `INSERT INTO article_history (article_id, content)
-       VALUES ($1, $2)`,
-      [input.id, content],
-    )
+    await tx.articleHistory.create({
+      data: {
+        articleId: BigInt(input.id),
+        content,
+      },
+    })
 
-    const history = await client.query<ArticleHistoryRow>(
-      `SELECT id, article_id, content, insert_time
-       FROM article_history
-       WHERE article_id = $1
-       ORDER BY insert_time DESC`,
-      [input.id],
-    )
+    const history = await tx.articleHistory.findMany({
+      where: { articleId: BigInt(input.id) },
+      orderBy: historyOrder,
+    })
 
-    await client.query('COMMIT')
-    return toArticleDto(updated.rows[0], history.rows)
-  }
-  catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  }
-  finally {
-    client.release()
-  }
+    return toArticleDto({ ...updated, history })
+  })
 }
 
 /**
  * 删：按 id 硬删除文章。
- * article_history 外键配置了 ON DELETE CASCADE，删文章时会自动清空该文的历史。
+ * 先从 article_groups 中移除该文章（组内无文章时删除分组），
+ * article_history 外键 CASCADE 自动清空历史。
  */
 export async function deleteArticle(id: number): Promise<boolean> {
-  const result = await pool.query(
-    `DELETE FROM articles
-     WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
-  )
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.article.findFirst({
+      where: { id: BigInt(id), deletedAt: null },
+    })
 
-  // rowCount 表示实际删了几行；0 表示 id 不存在或已删
-  return (result.rowCount ?? 0) > 0
+    if (!current)
+      return false
+
+    await removeArticleFromGroup(tx, current.linkedGroup, BigInt(id))
+
+    const result = await tx.article.deleteMany({
+      where: { id: BigInt(id), deletedAt: null },
+    })
+
+    return result.count > 0
+  })
 }

@@ -17,9 +17,7 @@ import { useSettingStore } from '@/store'
 // }
 
 export function fetchChatConfig<T = any>() {
-  return post<T>({
-    url: '/config',
-  })
+  return post<T>('/config')
 }
 
 // export function fetchChatAPIProcess<T = any>(
@@ -79,14 +77,9 @@ export function submitRequestBody(
 }
 
 export function fetchSession<T>() {
-  return post<T>({
-    url: '/session',
-  })
+  return post<T>('/session')
 }
 
 export function fetchVerify<T>(token: string) {
-  return post<T>({
-    url: '/verify',
-    data: { token },
-  })
+  return post<T>('/verify', { token })
 }

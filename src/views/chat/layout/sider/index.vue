@@ -5,7 +5,7 @@ import { NButton, NLayoutSider, useDialog } from 'naive-ui'
 import List from './List.vue'
 import ComposeList from './ComposeList.vue'
 import Footer from './Footer.vue'
-import { useAppStore, useChatStore } from '@/store'
+import { useAppStore, useChatStore, useComposeStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { PromptStore, SvgIcon } from '@/components/common'
 import { t } from '@/locales'
@@ -13,6 +13,7 @@ import type { SiderMode } from '@/store/modules/app/helper'
 
 const appStore = useAppStore()
 const chatStore = useChatStore()
+const composeStore = useComposeStore()
 
 const dialog = useDialog()
 
@@ -22,6 +23,7 @@ const show = ref(false)
 const collapsed = computed(() => appStore.siderCollapsed)
 const siderMode = computed(() => appStore.siderMode)
 const isChatMode = computed(() => siderMode.value === 'chat')
+const isComposeMode = computed(() => siderMode.value === 'compose')
 
 async function handleAdd() {
   await chatStore.goHome()
@@ -29,8 +31,9 @@ async function handleAdd() {
     appStore.setSiderCollapsed(true)
 }
 
-function handleAddText() {
-  // 占位：后续接入创作功能
+async function handleAddText() {
+  await composeStore.bootstrap()
+  await composeStore.createArticle('# 新文章\n')
   if (isMobile.value)
     appStore.setSiderCollapsed(true)
 }
@@ -75,6 +78,17 @@ const mobileSafeArea = computed(() => {
   }
   return {}
 })
+
+watch(
+  isComposeMode,
+  (val) => {
+    if (val)
+      composeStore.bootstrap()
+  },
+  {
+    immediate: true,
+  },
+)
 
 watch(
   isMobile,

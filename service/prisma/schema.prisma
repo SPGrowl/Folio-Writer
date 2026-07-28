@@ -1,0 +1,51 @@
+// 对齐 sql/init_articles.sql 与前端 Compose.Article
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 文章表，对应 Compose.Article（history 通过关联单独查）
+model Article {
+  id          BigInt    @id @default(autoincrement())
+  title       String    @default("未命名文章") @db.VarChar(256)
+  content     String    @default("")
+  linkedGroup String    @default("") @map("linked_group") @db.VarChar(256)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  history ArticleHistory[]
+
+  @@index([updatedAt(sort: Desc)], map: "idx_articles_updated")
+  @@index([linkedGroup], map: "idx_articles_linked_group")
+  @@map("articles")
+}
+
+/// 文章分组表：每组有唯一 UUID、名称及所含文章 ID 列表
+model ArticleGroup {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String   @default("未命名分组") @db.VarChar(256)
+  articleIds BigInt[] @default([]) @map("article_ids")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("article_groups")
+}
+
+/// 文章历史表，对应 Compose.history[]
+model ArticleHistory {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId  BigInt   @map("article_id")
+  content    String
+  insertTime DateTime @default(now()) @map("insert_time") @db.Timestamptz(6)
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, insertTime(sort: Desc)], map: "idx_article_history_article_time")
+  @@map("article_history")
+}

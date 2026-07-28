@@ -20,6 +20,7 @@ export default {
     no: '否',
     confirm: '确定',
     download: '下载',
+    loading: '加载中',
     noData: '暂无数据',
     wrong: '好像出错了，请稍后再试。',
     success: '操作成功',
