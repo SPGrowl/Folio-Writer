@@ -12,9 +12,10 @@
 --   article_groups.article_ids -> 本组包含的文章 id 列表
 --   articles.created_at    -> Compose.Article.createdAt
 --   articles.updated_at    -> Compose.Article.updatedAt
---   article_history.id     -> Compose.history.id          (string, UUID，接口层转字符串)
---   article_history.insert_time -> Compose.history.insertTime
---   article_history.content     -> Compose.history.content
+--   article_history.id          -> Compose.History.id          (UUID string)
+--   article_history.message     -> Compose.History.message     (commit message，类似 git -m)
+--   article_history.insert_time -> Compose.History.insertTime
+--   article_history.content     -> Compose.History.content
 --
 -- 前置：请先执行 sql/init.sql 创建 gpt_web 库，或确保库已存在
 --
@@ -58,12 +59,13 @@ CREATE TABLE IF NOT EXISTS article_groups (
 );
 
 -- ---------------------------------------------------------------------------
--- 文章历史表：对应 Compose.history[]，一条历史一行
--- id 使用 UUID，返回给前端时转为 string
+-- 文章历史表：对应 Compose.History[]，一条版本一行（类似 git commit）
+-- id：UUID 唯一版本号；message：提交说明（git -m）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS article_history (
   id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id   BIGINT       NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+  message      VARCHAR(512) NOT NULL DEFAULT '',
   content      TEXT         NOT NULL,
   insert_time  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );

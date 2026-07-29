@@ -1,28 +1,47 @@
 import { prisma } from './prisma'
 import { addArticleToGroup, removeArticleFromGroup } from './articleGroups'
 
-/** 与前端 Compose.Article 对齐的返回结构（驼峰命名） */
-export interface ArticleDto {
+/** 单条版本历史（类似 git commit） */
+export interface ArticleHistoryDto {
+  id: string
+  articleId: number
+  message: string
+  content: string
+  insertTime: string
+}
+
+/** 文章摘要（不含 history 列表，用于版本提交响应） */
+export interface ArticleSummaryDto {
   id: number
   title: string
   content: string
   linkedGroup: string
   createdAt: string
   updatedAt: string
-  history: Array<{
-    insertTime: string
-    content: string
-  }>
+}
+
+/** 与前端 Compose.Article 对齐的返回结构（驼峰命名） */
+export interface ArticleDto extends ArticleSummaryDto {
+  history: ArticleHistoryDto[]
+}
+
+/** 提交版本后的完整响应 */
+export interface CreateArticleHistoryResult {
+  version: ArticleHistoryDto
+  article: ArticleSummaryDto
+}
+
+/** 删除版本后的响应 */
+export interface DeleteArticleHistoryResult {
+  articleId: number
+  versionId: string
 }
 
 /** 新增文章时的入参 */
 export interface CreateArticleInput {
-  /** 可选：指定主键；不传则由数据库 BIGSERIAL 自增 */
   id?: number
   title?: string
-  /** 必填：文章正文 */
   content: string
-  /** 必填：所属文章组的 UUID */
   linkedGroupId: string
 }
 
@@ -33,24 +52,51 @@ export interface UpdateArticleInput {
   content: string
 }
 
-/** Prisma 查询 article + history 的返回形状 */
-interface ArticleWithHistory {
+/** 提交版本历史时的入参（类似 git commit -m） */
+export interface CreateArticleHistoryInput {
+  articleId: number
+  content: string
+  message: string
+}
+
+type HistoryRow = {
+  id: string
+  articleId: bigint
+  content: string
+  insertTime: Date
+  message?: string
+}
+
+type ArticleWithHistory = {
   id: bigint
   title: string
   content: string
   linkedGroup: string
   createdAt: Date
   updatedAt: Date
-  history: Array<{
-    insertTime: Date
-    content: string
-  }>
+  history: HistoryRow[]
 }
 
 const historyOrder = { insertTime: 'desc' as const }
 
-/** 把 Prisma 模型转成前端需要的 Article 对象（BigInt → number） */
-function toArticleDto(article: ArticleWithHistory): ArticleDto {
+function toHistoryDto(row: HistoryRow): ArticleHistoryDto {
+  return {
+    id: row.id,
+    articleId: Number(row.articleId),
+    message: row.message ?? '',
+    content: row.content,
+    insertTime: row.insertTime.toISOString(),
+  }
+}
+
+function toArticleSummary(article: {
+  id: bigint
+  title: string
+  content: string
+  linkedGroup: string
+  createdAt: Date
+  updatedAt: Date
+}): ArticleSummaryDto {
   return {
     id: Number(article.id),
     title: article.title,
@@ -58,20 +104,18 @@ function toArticleDto(article: ArticleWithHistory): ArticleDto {
     linkedGroup: article.linkedGroup,
     createdAt: article.createdAt.toISOString(),
     updatedAt: article.updatedAt.toISOString(),
-    history: article.history.map(h => ({
-      insertTime: h.insertTime.toISOString(),
-      content: h.content,
-    })),
+  }
+}
+
+function toArticleDto(article: ArticleWithHistory): ArticleDto {
+  return {
+    ...toArticleSummary(article),
+    history: article.history.map(toHistoryDto),
   }
 }
 
 /**
  * 查：拉取全部未删除文章，并附带各自的历史版本列表。
- * 历史按 insert_time 倒序（最新的在前）。
- *
- * Prisma 等价于：
- *   findMany({ where: { deletedAt: null }, include: { history } })
- * 替代原先两次 SQL + Map 分组的手动组装。
  */
 export async function listArticles(): Promise<ArticleDto[]> {
   const articles = await prisma.article.findMany({
@@ -86,9 +130,27 @@ export async function listArticles(): Promise<ArticleDto[]> {
 }
 
 /**
- * 增：插入一篇新文章，并把初始正文写入历史表（首条快照）。
- * 须传入 content 与 linkedGroupId，并将文章加入对应分组。
+ * 查：根据文章 ID 拉取该文章的全部版本历史。
  */
+export async function listArticleHistory(
+  articleId: number,
+): Promise<ArticleHistoryDto[] | null> {
+  const article = await prisma.article.findFirst({
+    where: { id: BigInt(articleId), deletedAt: null },
+    select: { id: true },
+  })
+
+  if (!article)
+    return null
+
+  const rows = await prisma.articleHistory.findMany({
+    where: { articleId: BigInt(articleId) },
+    orderBy: historyOrder,
+  })
+
+  return rows.map(toHistoryDto)
+}
+
 export async function createArticle(input: CreateArticleInput): Promise<ArticleDto> {
   const title = input.title?.trim() || '未命名文章'
   const content = input.content ?? ''
@@ -111,9 +173,6 @@ export async function createArticle(input: CreateArticleInput): Promise<ArticleD
         title,
         content,
         linkedGroup: linkedGroupId,
-        history: {
-          create: { content },
-        },
       },
       include: {
         history: { orderBy: historyOrder },
@@ -128,52 +187,77 @@ export async function createArticle(input: CreateArticleInput): Promise<ArticleD
   return toArticleDto(article)
 }
 
-/**
- * 改：按 id 更新文章正文（及可选标题）。
- * 更新完成后，把「本次更新后的全量正文」写入 article_history。
- *
- * Prisma 等价于：
- *   $transaction → findFirst → update → history.create → findMany
- * 事务内保证「读-改-写历史」原子性，替代 FOR UPDATE + 多条 SQL。
- */
 export async function updateArticle(input: UpdateArticleInput): Promise<ArticleDto | null> {
-  return prisma.$transaction(async (tx) => {
-    const current = await tx.article.findFirst({
-      where: { id: BigInt(input.id), deletedAt: null },
-    })
-
-    if (!current)
-      return null
-
-    const title = input.title?.trim() || current.title
-    const content = input.content
-
-    const updated = await tx.article.update({
-      where: { id: BigInt(input.id) },
-      data: { title, content },
-    })
-
-    await tx.articleHistory.create({
-      data: {
-        articleId: BigInt(input.id),
-        content,
-      },
-    })
-
-    const history = await tx.articleHistory.findMany({
-      where: { articleId: BigInt(input.id) },
-      orderBy: historyOrder,
-    })
-
-    return toArticleDto({ ...updated, history })
+  const current = await prisma.article.findFirst({
+    where: { id: BigInt(input.id), deletedAt: null },
   })
+
+  if (!current)
+    return null
+
+  const title = input.title?.trim() || current.title
+  const content = input.content
+
+  const updated = await prisma.article.update({
+    where: { id: BigInt(input.id) },
+    data: { title, content },
+    include: {
+      history: { orderBy: historyOrder },
+    },
+  })
+
+  return toArticleDto(updated)
 }
 
 /**
- * 删：按 id 硬删除文章。
- * 先从 article_groups 中移除该文章（组内无文章时删除分组），
- * article_history 外键 CASCADE 自动清空历史。
+ * 增：提交一条版本历史（类似 git commit -m）。
+ * 返回新版本的完整信息及所属文章摘要。
  */
+export async function createArticleHistory(
+  input: CreateArticleHistoryInput,
+): Promise<CreateArticleHistoryResult | null> {
+  const article = await prisma.article.findFirst({
+    where: { id: BigInt(input.articleId), deletedAt: null },
+  })
+
+  if (!article)
+    return null
+
+  const version = await prisma.articleHistory.create({
+    data: {
+      articleId: BigInt(input.articleId),
+      content: input.content,
+      message: input.message,
+    },
+  })
+
+  return {
+    version: toHistoryDto(version),
+    article: toArticleSummary(article),
+  }
+}
+
+/**
+ * 删：根据文章 ID + 版本 ID 删除单条历史。
+ * 不影响文章当前工作区正文。
+ */
+export async function deleteArticleHistory(
+  articleId: number,
+  versionId: string,
+): Promise<DeleteArticleHistoryResult | null> {
+  const deleted = await prisma.articleHistory.deleteMany({
+    where: {
+      id: versionId,
+      articleId: BigInt(articleId),
+    },
+  })
+
+  if (deleted.count === 0)
+    return null
+
+  return { articleId, versionId }
+}
+
 export async function deleteArticle(id: number): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     const current = await tx.article.findFirst({

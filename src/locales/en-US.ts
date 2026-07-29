@@ -64,6 +64,12 @@ export default {
     newTextButton: 'New Text',
     placeholder: 'Select a text to start composing, or create a new one',
     deleteArticleConfirm: 'Are you sure to delete this text?',
+    sync: {
+      saved: 'Synced with cloud',
+      dirty: 'Unsaved changes',
+      loading: 'Syncing…',
+      failed: 'Sync failed, click to retry',
+    },
   },
   setting: {
     setting: 'Setting',

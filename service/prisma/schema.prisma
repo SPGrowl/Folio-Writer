@@ -37,10 +37,11 @@ model ArticleGroup {
   @@map("article_groups")
 }
 
-/// 文章历史表，对应 Compose.history[]
+/// 文章历史表，对应 Compose.History[]（类似 git commit）
 model ArticleHistory {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   articleId  BigInt   @map("article_id")
+  message    String   @default("") @db.VarChar(512)
   content    String
   insertTime DateTime @default(now()) @map("insert_time") @db.Timestamptz(6)
 

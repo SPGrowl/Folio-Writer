@@ -7,11 +7,8 @@ import {
   fetchArticles,
   updateArticle as apiUpdateArticle,
 } from '@/api/compose'
+import { ApiError } from '@/utils/request'
 import { defaultState, getLocalState, setLocalActiveId } from './helper'
-
-function findArticleIndex(articles: Compose.Article[], id: number) {
-  return articles.findIndex(article => article.id === id)
-}
 
 export const useComposeStore = defineStore('compose-store', {
   state: (): Compose.ComposeState => ({
@@ -42,12 +39,17 @@ export const useComposeStore = defineStore('compose-store', {
       this.recordActiveId()
     },
 
-    async bootstrap(force = false) {
-      if (this.loading)
-        return
-      if (!force && this.articles.length && this.groups.length)
-        return
+    resetSyncState() {
+      this.syncState = 'saved'
+      this.syncError = null
+    },
 
+    markDirty() {
+      if (this.syncState !== 'loading')
+        this.syncState = 'dirty'
+    },
+
+    async bootstrap(_force = false) {
       this.loading = true
       try {
         const [articlesRes, groupsRes] = await Promise.all([
@@ -64,11 +66,6 @@ export const useComposeStore = defineStore('compose-store', {
         ) {
           this.activeArticleId = null
         }
-
-        if (this.activeArticleId == null && this.articles.length)
-          this.activeArticleId = this.articles[0].id
-
-        this.recordActiveId()
       }
       finally {
         this.loading = false
@@ -91,45 +88,34 @@ export const useComposeStore = defineStore('compose-store', {
         content,
         title,
       })
-
-      this.articles.unshift(data)
-
-      const targetGroup = this.groups.find(item => item.id === group.id)
-      if (targetGroup && !targetGroup.articleIds.includes(data.id))
-        targetGroup.articleIds.push(data.id)
-
+      await this.bootstrap()
       this.setActive(data.id)
       return data
     },
 
-    async saveArticle(id: number, patch: { title?: string, content: string }) {
-      this.saving = true
+    /** 仅发 PUT，不回写 articles，正文对齐走 bootstrap */
+    async saveArticle(id: number, content: string, title?: string) {
+      const article = this.articles.find(item => item.id === id)
+      const resolvedTitle = title ?? article?.title ?? '未命名文章'
+
+      this.syncState = 'loading'
+      this.syncError = null
+
       try {
-        const { data } = await apiUpdateArticle(id, patch)
-        const index = findArticleIndex(this.articles, id)
-        if (index !== -1)
-          this.articles[index] = data
-        return data
+        await apiUpdateArticle(id, { content, title: resolvedTitle })
+        this.syncState = 'saved'
       }
-      finally {
-        this.saving = false
+      catch (error) {
+        this.syncState = 'failed'
+        this.syncError = error instanceof ApiError ? error.message : '同步失败'
+        throw error
       }
     },
 
     async removeArticle(id: number) {
       await apiDeleteArticle(id)
-
-      const index = findArticleIndex(this.articles, id)
-      if (index !== -1)
-        this.articles.splice(index, 1)
-
-      this.groups.forEach((group) => {
-        group.articleIds = group.articleIds.filter(articleId => articleId !== id)
-      })
-      this.groups = this.groups.filter(group => group.articleIds.length > 0)
-
-      if (this.activeArticleId === id)
-        this.setActive(this.articles[0]?.id ?? null)
+      await this.bootstrap()
+      this.setActive(null)
     },
 
     async createGroup(name: string) {

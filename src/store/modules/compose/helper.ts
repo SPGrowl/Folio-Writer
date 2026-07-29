@@ -8,10 +8,12 @@ export function defaultState(): Compose.ComposeState {
     groups: [],
     activeArticleId: null,
     loading: false,
-    saving: false,
+    syncState: 'saved',
+    syncError: null,
   }
 }
 
+// TODO:语义不一致
 export function getLocalState(): Pick<Compose.ComposeState, 'activeArticleId'> {
   return ss.get(LOCAL_NAME) ?? { activeArticleId: null }
 }

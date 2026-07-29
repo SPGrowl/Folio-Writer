@@ -66,6 +66,12 @@ export default {
   compose: {
     newTextButton: '新建文本',
     placeholder: '选择一个文本开始创作，或新建文本',
+    sync: {
+      saved: '已与云端同步',
+      dirty: '有未同步的修改',
+      loading: '正在同步…',
+      failed: '同步失败，点击重试',
+    },
   },
 	tooltip:{
 		stop: '停止响应',

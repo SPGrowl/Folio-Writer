@@ -1,5 +1,8 @@
 declare namespace Compose {
+	type SyncState = 'saved' | 'dirty' | 'loading' | 'failed'
 	interface History {
+		id: string
+		message: string
 		insertTime: string
 		content: string
 	  }
@@ -24,6 +27,7 @@ declare namespace Compose {
 		groups: ArticleGroup[]
 		activeArticleId: number | null
 		loading: boolean
-		saving: boolean
+		syncState: SyncState
+		syncError: string | null
 	  }
 }

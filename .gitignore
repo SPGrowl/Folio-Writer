@@ -31,3 +31,6 @@ coverage
 # Environment variables files
 /service/.env
 
+# Local development notes (not for version control)
+dev-log/
+

@@ -5,7 +5,10 @@ import {
 } from '../db/articleGroups'
 import {
   createArticle,
+  createArticleHistory,
   deleteArticle,
+  deleteArticleHistory,
+  listArticleHistory,
   listArticles,
   updateArticle,
 } from '../db/articles'
@@ -13,35 +16,32 @@ import {
 /**
  * 注册文章与文章组 CRUD 路由。
  *
- * 接口一览：
- *   GET    /articles              查：整表列表（含 history）
- *   POST   /articles              增：{ linkedGroupId, content, id?, title? }
- *   PUT    /articles/:id          改：{ title?, content }
- *   DELETE /articles/:id          删：删文章并级联清空历史
- *   GET    /article-groups        查：文章组列表
- *   POST   /article-groups        增：{ name }，后端生成唯一组 ID
+ * 文章：
+ *   GET    /articles                        查：全部文章（含 history）
+ *   POST   /articles                        增：{ linkedGroupId, content, id?, title? }
+ *   PUT    /articles/:id                    改：{ title?, content }，不写 history
+ *   DELETE /articles/:id                    删：删文章并级联清空 history
+ *
+ * 版本历史（类似 git）：
+ *   GET    /articles/:id/history            查：本文章全部版本
+ *   POST   /articles/:id/history            增：{ content, message } 提交版本
+ *   DELETE /articles/:id/history/:versionId 删：删除单条版本
+ *
+ * 文章组：
+ *   GET    /article-groups                  查：文章组列表
+ *   POST   /article-groups                  增：{ name }
  */
 export function registerArticleRoutes(router: Router) {
-  /** 查：拉取整个文章列表 */
   router.get('/articles', async (_req, res) => {
     try {
       const articles = await listArticles()
-      res.send({
-        status: 'Success',
-        message: '',
-        data: articles,
-      })
+      res.send({ status: 'Success', message: '', data: articles })
     }
     catch (error: any) {
-      res.status(500).send({
-        status: 'Fail',
-        message: error.message,
-        data: null,
-      })
+      res.status(500).send({ status: 'Fail', message: error.message, data: null })
     }
   })
 
-  /** 增：根据文章内容及所属组 ID 新增文章，初始正文写入历史 */
   router.post('/articles', async (req, res) => {
     try {
       const { id, title, content, linkedGroupId } = req.body ?? {}
@@ -62,28 +62,18 @@ export function registerArticleRoutes(router: Router) {
         linkedGroupId: linkedGroupId.trim(),
       })
 
-      res.send({
-        status: 'Success',
-        message: '',
-        data: article,
-      })
+      res.send({ status: 'Success', message: '', data: article })
     }
     catch (error: any) {
-      res.status(400).send({
-        status: 'Fail',
-        message: error.message,
-        data: null,
-      })
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
     }
   })
 
-  /** 改：根据文章 id 更新内容，并将更新后的全量正文写入历史 */
   router.put('/articles/:id', async (req, res) => {
     try {
       const id = Number(req.params.id)
       if (Number.isNaN(id))
         throw new Error('路径参数 id 须为数字')
-
 
       const { title, content } = req.body ?? {}
 
@@ -97,30 +87,17 @@ export function registerArticleRoutes(router: Router) {
       })
 
       if (!article) {
-        res.status(404).send({
-          status: 'Fail',
-          message: '文章不存在',
-          data: null,
-        })
+        res.status(404).send({ status: 'Fail', message: '文章不存在', data: null })
         return
       }
 
-      res.send({
-        status: 'Success',
-        message: '',
-        data: article,
-      })
+      res.send({ status: 'Success', message: '', data: article })
     }
     catch (error: any) {
-      res.status(400).send({
-        status: 'Fail',
-        message: error.message,
-        data: null,
-      })
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
     }
   })
 
-  /** 删：根据文章 id 删除，历史表由外键 CASCADE 自动清空 */
   router.delete('/articles/:id', async (req, res) => {
     try {
       const id = Number(req.params.id)
@@ -130,49 +107,110 @@ export function registerArticleRoutes(router: Router) {
       const deleted = await deleteArticle(id)
 
       if (!deleted) {
+        res.status(404).send({ status: 'Fail', message: '文章不存在', data: null })
+        return
+      }
+
+      res.send({ status: 'Success', message: '', data: null })
+    }
+    catch (error: any) {
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
+    }
+  })
+
+  /** 查：拉取本文章的全部版本历史 */
+  router.get('/articles/:id/history', async (req, res) => {
+    try {
+      const articleId = Number(req.params.id)
+      if (Number.isNaN(articleId))
+        throw new Error('路径参数 id 须为数字')
+
+      const versions = await listArticleHistory(articleId)
+
+      if (versions === null) {
+        res.status(404).send({ status: 'Fail', message: '文章不存在', data: null })
+        return
+      }
+
+      res.send({ status: 'Success', message: '', data: versions })
+    }
+    catch (error: any) {
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
+    }
+  })
+
+  /** 增：提交一条版本（content + message，类似 git commit -m） */
+  router.post('/articles/:id/history', async (req, res) => {
+    try {
+      const articleId = Number(req.params.id)
+      if (Number.isNaN(articleId))
+        throw new Error('路径参数 id 须为数字')
+
+      const { content, message } = req.body ?? {}
+
+      if (typeof content !== 'string')
+        throw new Error('content 必填且须为字符串')
+
+      if (typeof message !== 'string')
+        throw new Error('message 必填且须为字符串（类似 git -m）')
+
+      const result = await createArticleHistory({
+        articleId,
+        content,
+        message: message.trim(),
+      })
+
+      if (!result) {
+        res.status(404).send({ status: 'Fail', message: '文章不存在', data: null })
+        return
+      }
+
+      res.send({ status: 'Success', message: '', data: result })
+    }
+    catch (error: any) {
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
+    }
+  })
+
+  /** 删：根据文章 ID + 版本 ID 删除单条历史 */
+  router.delete('/articles/:id/history/:versionId', async (req, res) => {
+    try {
+      const articleId = Number(req.params.id)
+      if (Number.isNaN(articleId))
+        throw new Error('路径参数 id 须为数字')
+
+      const versionId = req.params.versionId?.trim()
+      if (!versionId)
+        throw new Error('versionId 必填')
+
+      const result = await deleteArticleHistory(articleId, versionId)
+
+      if (!result) {
         res.status(404).send({
           status: 'Fail',
-          message: '文章不存在',
+          message: '文章或版本不存在',
           data: null,
         })
         return
       }
 
-      res.send({
-        status: 'Success',
-        message: '',
-        data: null,
-      })
+      res.send({ status: 'Success', message: '', data: result })
     }
     catch (error: any) {
-      res.status(400).send({
-        status: 'Fail',
-        message: error.message,
-        data: null,
-      })
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
     }
   })
 
-  /** 查：拉取全部文章组 */
   router.get('/article-groups', async (_req, res) => {
     try {
       const groups = await listArticleGroups()
-      res.send({
-        status: 'Success',
-        message: '',
-        data: groups,
-      })
+      res.send({ status: 'Success', message: '', data: groups })
     }
     catch (error: any) {
-      res.status(500).send({
-        status: 'Fail',
-        message: error.message,
-        data: null,
-      })
+      res.status(500).send({ status: 'Fail', message: error.message, data: null })
     }
   })
 
-  /** 增：新建文章组，后端生成唯一 ID */
   router.post('/article-groups', async (req, res) => {
     try {
       const { name } = req.body ?? {}
@@ -182,18 +220,10 @@ export function registerArticleRoutes(router: Router) {
 
       const group = await createArticleGroup({ name: name.trim() })
 
-      res.send({
-        status: 'Success',
-        message: '',
-        data: group,
-      })
+      res.send({ status: 'Success', message: '', data: group })
     }
     catch (error: any) {
-      res.status(400).send({
-        status: 'Fail',
-        message: error.message,
-        data: null,
-      })
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
     }
   })
 }
