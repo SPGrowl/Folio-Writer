@@ -63,7 +63,20 @@ export default {
   compose: {
     newTextButton: 'New Text',
     placeholder: 'Select a text to start composing, or create a new one',
+    untitled: 'Untitled',
     deleteArticleConfirm: 'Are you sure to delete this text?',
+    agent: {
+      expand: 'Expand Agent panel',
+      collapse: 'Collapse panel',
+      newChat: 'New chat',
+      newTabTitle: 'Chat {n}',
+      history: 'Chat history',
+      emptyHint: 'Agent conversations will appear here',
+      modeAgent: 'Agent',
+      modeAsk: 'Ask',
+      placeholderAgent: 'Describe changes you want to make… (Shift + Enter for newline)',
+      placeholderAsk: 'Ask about this document… (Shift + Enter for newline)',
+    },
     sync: {
       saved: 'Synced with cloud',
       dirty: 'Unsaved changes',

@@ -28,13 +28,23 @@ export type SiderMode = 'chat' | 'compose'
 export interface AppState {
   siderCollapsed: boolean
   siderMode: SiderMode
+  agentSidebarCollapsed: boolean
+  agentSidebarWidth: number
   theme: Theme
   language: Language
   liteMode:boolean
 }
 export function defaultSetting(): AppState {
   const language = languageMap[navigator.language]
-  return { siderCollapsed: false, siderMode: 'chat', theme: 'light', language ,liteMode:false}
+  return {
+    siderCollapsed: false,
+    siderMode: 'chat',
+    agentSidebarCollapsed: false,
+    agentSidebarWidth: 380,
+    theme: 'light',
+    language,
+    liteMode: false,
+  }
 }
 
 export function getLocalSetting(): AppState {

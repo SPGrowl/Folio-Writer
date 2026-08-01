@@ -16,6 +16,16 @@ export const useAppStore = defineStore('app-store', {
       this.recordState()
     },
 
+    setAgentSidebarCollapsed(collapsed: boolean) {
+      this.agentSidebarCollapsed = collapsed
+      this.recordState()
+    },
+
+    setAgentSidebarWidth(width: number) {
+      this.agentSidebarWidth = width
+      this.recordState()
+    },
+
     setTheme(theme: Theme) {
       this.theme = theme
       this.recordState()

@@ -20,11 +20,11 @@ async function handleAdd() {
 }
 
 function isActive(id: number) {
-  return composeStore.activeArticleId === id
+  return composeStore.openArticle.includes(id)
 }
 
 function handleSelect(article: Compose.Article) {
-  composeStore.setActive(article.id)
+  composeStore.openTab(article.id)
   if (isMobile.value)
     appStore.setSiderCollapsed(true)
 }

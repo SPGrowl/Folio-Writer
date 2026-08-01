@@ -66,6 +66,19 @@ export default {
   compose: {
     newTextButton: '新建文本',
     placeholder: '选择一个文本开始创作，或新建文本',
+    untitled: '未命名文章',
+    agent: {
+      expand: '展开 Agent 侧栏',
+      collapse: '折叠侧栏',
+      newChat: '新建对话',
+      newTabTitle: '对话 {n}',
+      history: '对话历史',
+      emptyHint: 'Agent 对话将显示在这里',
+      modeAgent: 'Agent',
+      modeAsk: 'Ask',
+      placeholderAgent: '描述你想对文档做的修改…（Shift + Enter 换行）',
+      placeholderAsk: '就当前文档提问…（Shift + Enter 换行）',
+    },
     sync: {
       saved: '已与云端同步',
       dirty: '有未同步的修改',
