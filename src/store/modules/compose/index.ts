@@ -3,40 +3,35 @@ import {
   createArticle as apiCreateArticle,
   createArticleGroup as apiCreateArticleGroup,
   deleteArticle as apiDeleteArticle,
+  deleteArticleGroup as apiDeleteArticleGroup,
   fetchArticleGroups,
   fetchArticles,
   updateArticle as apiUpdateArticle,
+  updateArticleGroup as apiUpdateArticleGroup,
 } from '@/api/compose'
-import { ApiError } from '@/utils/request'
 import {
   articleFromApi,
-  attachDraft,
-  collectPreservedTabState,
   defaultState,
-  detachDraft,
   findArticleById,
-  getLocalState,
-  mergeArticleOnBootstrap,
-  setLocalComposeUi,
 } from './helper'
+import { useComposeTabStore } from '../composeTab'
 
 export const useComposeStore = defineStore('compose-store', {
   state: (): Compose.ComposeState => ({
     ...defaultState(),
-    ...getLocalState(),
   }),
 
   getters: {
-    activeArticle(state: Compose.ComposeState): Compose.Article | null {
-      if (state.activeArticleId == null)
-        return null
-      return findArticleById(state, state.activeArticleId) ?? null
+    defaultGroup(state: Compose.ComposeState) {
+      return state.groups.find(group => group.isDefault) ?? null
     },
 
-    openArticles(state: Compose.ComposeState): Compose.Article[] {
-      return state.openArticle
-        .map(id => findArticleById(state, id))
-        .filter((article): article is Compose.Article => article != null && article.draft !== undefined)
+    sortedGroups(state: Compose.ComposeState) {
+      return [...state.groups].sort((a, b) => {
+        if (a.isDefault !== b.isDefault)
+          return a.isDefault ? -1 : 1
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      })
     },
 
     articlesByGroup(state: Compose.ComposeState) {
@@ -50,149 +45,31 @@ export const useComposeStore = defineStore('compose-store', {
       return findArticleById(this.$state, id)
     },
 
-    recordUiState() {
-      setLocalComposeUi({
-        activeArticleId: this.activeArticleId,
-        openArticle: this.openArticle,
-      })
-    },
-
-    setActive(id: number | null) {
-      this.activeArticleId = id
-      this.recordUiState()
-    },
-
-    /** 编辑 draft 时标记该篇 dirty */
-    markDirty(id: number) {
-      const article = this.findArticle(id)
-      if (!article || article.syncState === 'loading')
-        return
-      article.syncState = 'dirty'
-    },
-
-    /** 1. 打开文章：未在 openArticle 则 content→draft 并加入页签；设为活跃 ID */
-    openTab(id: number) {
-      const article = this.findArticle(id)
-      if (!article)
-        return
-
-      if (!this.openArticle.includes(id)) {
-        this.openArticle.push(id)
-        const withDraft = attachDraft(article)
-        Object.assign(article, withDraft)
-      }
-
-      this.setActive(id)
-    },
-
-    /** 3. 切换页签：仅更新并持久化 activeArticleId */
-    switchTab(id: number) {
-      if (!this.openArticle.includes(id))
-        return
-      this.setActive(id)
-    },
-
-    /**
-     * 2. 关闭页签：未 saved 则同步 draft 到云端并写回 content，随后清空 draft
-     */
-    async closeTab(id: number) {
-      const index = this.openArticle.indexOf(id)
-      if (index === -1)
-        return
-
-      const article = this.findArticle(id)
-      if (article?.draft !== undefined && article.syncState !== 'saved') {
-        try {
-          await this.saveArticle(id, article.draft, article.title)
-        }
-        catch {
-          return
-        }
-      }
-
-      if (article)
-        Object.assign(article, detachDraft(article))
-
-      this.openArticle.splice(index, 1)
-
-      if (this.activeArticleId === id) {
-        const nextId = this.openArticle[index] ?? this.openArticle[index - 1] ?? null
-        this.setActive(nextId)
-      }
-      else {
-        this.recordUiState()
-      }
-    },
-
-    /**
-     * 4. 将 draft 同步到云端；更新 content，并在该篇上维护 syncState
-     */
-    async saveArticle(id: number, content: string, title?: string) {
+    /** 将内容持久化到云端，并更新 Article 数据源 */
+    async persistArticle(id: number, content: string, title?: string) {
       const article = this.findArticle(id)
       if (!article)
         throw new Error('文章不存在')
 
       const resolvedTitle = title ?? article.title ?? '未命名文章'
-
-      article.syncState = 'loading'
-      article.syncError = null
-
-      try {
-        await apiUpdateArticle(id, { content, title: resolvedTitle })
-        article.content = content
-        if (article.draft !== undefined)
-          article.draft = content
-        article.syncState = 'saved'
-        article.syncError = null
-      }
-      catch (error) {
-        article.syncState = 'failed'
-        article.syncError = error instanceof ApiError ? error.message : '同步失败'
-        throw error
-      }
+      await apiUpdateArticle(id, { content, title: resolvedTitle })
+      article.content = content
+      article.title = resolvedTitle
     },
 
-    /**
-     * 5. 页面初始化：拉列表 + 为 openArticle 中的篇目生成 draft
-     *    已打开且本地有 draft 的篇目保留本地状态（不强制从 content 覆盖）
-     */
+    /** 页面初始化：拉取文章与分组列表，并重建页签 */
     async bootstrap(_force = false) {
       this.loading = true
       try {
-        const preserved = collectPreservedTabState(this.$state)
-
         const [articlesRes, groupsRes] = await Promise.all([
           fetchArticles(),
           fetchArticleGroups(),
         ])
 
-        const openIds = [...this.openArticle]
-
-        this.articles = articlesRes.data.map(item =>
-          mergeArticleOnBootstrap(
-            articleFromApi(item),
-            openIds,
-            preserved,
-          ),
-        )
+        this.articles = articlesRes.data.map(item => articleFromApi(item))
         this.groups = groupsRes.data
 
-        const filteredOpen = openIds.filter(id =>
-          this.articles.some(article => article.id === id),
-        )
-        this.$patch({ openArticle: filteredOpen })
-
-        if (filteredOpen.length === 0) {
-          this.activeArticleId = null
-        }
-        else if (
-          this.activeArticleId == null
-          || !filteredOpen.includes(this.activeArticleId)
-        ) {
-          this.activeArticleId = filteredOpen[filteredOpen.length - 1]
-        }
-
-        this.recordUiState()
+        useComposeTabStore().reconcileAfterBootstrap(this.articles)
       }
       finally {
         this.loading = false
@@ -200,44 +77,34 @@ export const useComposeStore = defineStore('compose-store', {
     },
 
     async ensureDefaultGroup() {
-      if (this.groups.length)
-        return this.groups[0]
+      if (this.defaultGroup)
+        return this.defaultGroup
 
-      const { data } = await apiCreateArticleGroup('默认分组')
-      this.groups.unshift(data)
-      return data
+      await this.bootstrap(true)
+      if (this.defaultGroup)
+        return this.defaultGroup
+
+      throw new Error('默认分组不存在')
     },
 
-    async createArticle(content = '', title?: string) {
-      const group = await this.ensureDefaultGroup()
+    async createArticle(content = '', title?: string, groupId?: string) {
+      const group = groupId
+        ? this.groups.find(item => item.id === groupId) ?? await this.ensureDefaultGroup()
+        : await this.ensureDefaultGroup()
+
       const { data } = await apiCreateArticle({
         linkedGroupId: group.id,
         content,
         title,
       })
       await this.bootstrap()
-      this.openTab(data.id)
+      useComposeTabStore().openTab(data.id)
       return data
     },
 
     async removeArticle(id: number) {
-      const index = this.openArticle.indexOf(id)
-      if (index !== -1) {
-        const article = this.findArticle(id)
-        if (article?.draft !== undefined && article.syncState !== 'saved') {
-          await this.saveArticle(id, article.draft, article.title).catch(() => {})
-        }
-        if (article)
-          Object.assign(article, detachDraft(article))
-        this.openArticle.splice(index, 1)
-        if (this.activeArticleId === id) {
-          const nextId = this.openArticle[index] ?? this.openArticle[index - 1] ?? null
-          this.setActive(nextId)
-        }
-        else {
-          this.recordUiState()
-        }
-      }
+      const tabStore = useComposeTabStore()
+      await tabStore.closeTabIfOpen(id)
 
       await apiDeleteArticle(id)
       await this.bootstrap()
@@ -249,14 +116,17 @@ export const useComposeStore = defineStore('compose-store', {
       return data
     },
 
-    /** 离开页面前保存所有未同步的打开页签 */
-    async flushOpenTabsIfDirty() {
-      for (const id of [...this.openArticle]) {
-        const article = this.findArticle(id)
-        if (article?.draft !== undefined && article.syncState !== 'saved') {
-          await this.saveArticle(id, article.draft, article.title).catch(() => {})
-        }
-      }
+    async renameGroup(id: string, name: string) {
+      const { data } = await apiUpdateArticleGroup(id, name)
+      const index = this.groups.findIndex(group => group.id === id)
+      if (index >= 0)
+        this.groups[index] = data
+      return data
+    },
+
+    async removeGroup(id: string) {
+      await apiDeleteArticleGroup(id)
+      await this.bootstrap()
     },
   },
 })

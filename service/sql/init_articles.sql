@@ -54,9 +54,15 @@ CREATE TABLE IF NOT EXISTS article_groups (
   id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   name         VARCHAR(256) NOT NULL DEFAULT '未命名分组',
   article_ids  BIGINT[]     NOT NULL DEFAULT '{}',
+  is_default   BOOLEAN      NOT NULL DEFAULT false,
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+
+-- 默认分组（不可删除）
+INSERT INTO article_groups (id, name, article_ids, is_default)
+SELECT gen_random_uuid(), '默认分组', '{}', true
+WHERE NOT EXISTS (SELECT 1 FROM article_groups WHERE is_default = true);
 
 -- ---------------------------------------------------------------------------
 -- 文章历史表：对应 Compose.History[]，一条版本一行（类似 git commit）

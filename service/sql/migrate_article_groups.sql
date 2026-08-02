@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS article_groups (
   id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   name         VARCHAR(256) NOT NULL DEFAULT '未命名分组',
   article_ids  BIGINT[]     NOT NULL DEFAULT '{}',
+  is_default   BOOLEAN      NOT NULL DEFAULT false,
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );

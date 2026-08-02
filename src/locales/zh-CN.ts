@@ -65,8 +65,17 @@ export default {
   },
   compose: {
     newTextButton: '新建文本',
+    newGroupButton: '新建分组',
+    defaultGroup: '默认分组',
+    renameGroup: '重命名分组',
+    deleteGroupConfirm: '确定删除该分组？组内文章将移至默认分组。',
+    deleteArticleConfirm: '确定删除该文本？',
     placeholder: '选择一个文本开始创作，或新建文本',
     untitled: '未命名文章',
+    editorMain: '主编辑器',
+    editorDiff: '变更预览',
+    acceptChanges: '采纳变更',
+    rejectChanges: '拒绝变更',
     agent: {
       expand: '展开 Agent 侧栏',
       collapse: '折叠侧栏',

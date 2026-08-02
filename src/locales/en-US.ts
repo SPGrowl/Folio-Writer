@@ -62,9 +62,17 @@ export default {
   },
   compose: {
     newTextButton: 'New Text',
+    newGroupButton: 'New Group',
+    defaultGroup: 'Default',
+    renameGroup: 'Rename group',
+    deleteGroupConfirm: 'Delete this group? Articles will be moved to the default group.',
+    deleteArticleConfirm: 'Are you sure to delete this text?',
     placeholder: 'Select a text to start composing, or create a new one',
     untitled: 'Untitled',
-    deleteArticleConfirm: 'Are you sure to delete this text?',
+    editorMain: 'Main editor',
+    editorDiff: 'Diff preview',
+    acceptChanges: 'Accept changes',
+    rejectChanges: 'Reject changes',
     agent: {
       expand: 'Expand Agent panel',
       collapse: 'Collapse panel',

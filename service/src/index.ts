@@ -5,6 +5,7 @@ import express from 'express'
 // import { chatConfig, chatReplyProcess, currentModel } from './chatgpt'
 import { testConnection } from './db/pool'
 import { testPrismaConnection } from './db/prisma'
+import { ensureDefaultArticleGroup } from './db/articleGroups'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
 import { registerArticleRoutes } from './routes/articles'
@@ -115,6 +116,7 @@ app.listen(3002, async () => {
   try {
     await testConnection()
     await testPrismaConnection()
+    await ensureDefaultArticleGroup()
     globalThis.console.log('PostgreSQL connected (pg + Prisma)')
   }
   catch (error: any) {

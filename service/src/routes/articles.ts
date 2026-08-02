@@ -1,7 +1,9 @@
 import type { Router } from 'express'
 import {
   createArticleGroup,
+  deleteArticleGroup,
   listArticleGroups,
+  updateArticleGroup,
 } from '../db/articleGroups'
 import {
   createArticle,
@@ -30,6 +32,8 @@ import {
  * 文章组：
  *   GET    /article-groups                  查：文章组列表
  *   POST   /article-groups                  增：{ name }
+ *   PUT    /article-groups/:id              改：{ name }
+ *   DELETE /article-groups/:id              删：组内文章移至默认分组（默认分组不可删）
  */
 export function registerArticleRoutes(router: Router) {
   router.get('/articles', async (_req, res) => {
@@ -221,6 +225,51 @@ export function registerArticleRoutes(router: Router) {
       const group = await createArticleGroup({ name: name.trim() })
 
       res.send({ status: 'Success', message: '', data: group })
+    }
+    catch (error: any) {
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
+    }
+  })
+
+  router.put('/article-groups/:id', async (req, res) => {
+    try {
+      const id = req.params.id?.trim()
+      if (!id)
+        throw new Error('路径参数 id 必填')
+
+      const { name } = req.body ?? {}
+
+      if (typeof name !== 'string' || !name.trim())
+        throw new Error('name 必填且须为非空字符串')
+
+      const group = await updateArticleGroup(id, { name: name.trim() })
+
+      if (!group) {
+        res.status(404).send({ status: 'Fail', message: '文章组不存在', data: null })
+        return
+      }
+
+      res.send({ status: 'Success', message: '', data: group })
+    }
+    catch (error: any) {
+      res.status(400).send({ status: 'Fail', message: error.message, data: null })
+    }
+  })
+
+  router.delete('/article-groups/:id', async (req, res) => {
+    try {
+      const id = req.params.id?.trim()
+      if (!id)
+        throw new Error('路径参数 id 必填')
+
+      const deleted = await deleteArticleGroup(id)
+
+      if (!deleted) {
+        res.status(404).send({ status: 'Fail', message: '文章组不存在', data: null })
+        return
+      }
+
+      res.send({ status: 'Success', message: '', data: null })
     }
     catch (error: any) {
       res.status(400).send({ status: 'Fail', message: error.message, data: null })

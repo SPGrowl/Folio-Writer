@@ -8,6 +8,7 @@ declare namespace Compose {
     content: string
   }
 
+  /** 纯数据源：来自 API / 持久化层 */
   interface Article {
     id: number
     title: string
@@ -16,16 +17,13 @@ declare namespace Compose {
     createdAt: string
     updatedAt: string
     history: History[]
-    /** 仅 openArticle 中的文章存在 */
-    draft?: string
-    syncState?: SyncState
-    syncError?: string | null
   }
 
   interface ArticleGroup {
     id: string
     name: string
     articleIds: number[]
+    isDefault: boolean
     createdAt: string
     updatedAt: string
   }
@@ -33,24 +31,28 @@ declare namespace Compose {
   interface ComposeState {
     articles: Article[]
     groups: ArticleGroup[]
-    activeArticleId: number | null
-    openArticle: number[]
     loading: boolean
   }
-  interface Tab{
-    linkedID:number,
-    title:string,
-    changes?:
-    {
-      diff:any,
-      content:string,
-    }
-    syncState:SyncState,
-    draft:string,
-    syncError:string | null,
+
+  /** LLM 工具调用返回的变更，用于副编辑器 diff 对比 */
+  interface TabChanges {
+    diff: unknown
+    content: string
   }
-  interface TabState{
-    openTabs:number[],
-    activeArticleId:number,
+
+  /** 页签视图层：draft / 同步状态 / LLM 变更 */
+  interface Tab {
+    linkedID: number
+    title: string
+    draft: string
+    syncState: SyncState
+    syncError: string | null
+    changes?: TabChanges
+  }
+
+  interface TabState {
+    tabs: Record<number, Tab>
+    openTabs: number[]
+    activeArticleId: number | null
   }
 }

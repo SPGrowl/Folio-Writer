@@ -38,3 +38,13 @@ export function fetchArticleGroups() {
 export function createArticleGroup(name: string) {
   return post<Compose.ArticleGroup>('/article-groups', { name })
 }
+
+/** 更新分组名称 */
+export function updateArticleGroup(id: string, name: string) {
+  return put<Compose.ArticleGroup>(`/article-groups/${id}`, { name })
+}
+
+/** 删除分组（组内文章移至默认分组） */
+export function deleteArticleGroup(id: string) {
+  return del<null>(`/article-groups/${id}`)
+}

@@ -1,42 +1,44 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from 'vue'
-import { NTooltip } from 'naive-ui'
+import { NButton, NTooltip } from 'naive-ui'
 import AgentSidebar from '@/views/chat/compose/AgentSidebar/index.vue'
 import ComposeTabs from '@/views/chat/compose/ComposeTabs.vue'
 import MarkdownEditor from '@/components/custom/MarkdownEditor/index.vue'
+import DiffMarkdownEditor from '@/components/custom/DiffMarkdownEditor/index.vue'
 import { SvgIcon } from '@/components/common'
-import { useComposeStore } from '@/store'
+import { useComposeTabStore } from '@/store'
 import { debounce } from '@/utils/functions/debounce'
 import { t } from '@/locales'
 
-const composeStore = useComposeStore()
+const tabStore = useComposeTabStore()
 
 const debouncedSave = debounce((id: number, value: string, title: string) => {
-  composeStore.saveArticle(id, value, title).catch(() => {})
+  tabStore.saveTab(id, value, title).catch(() => {})
 }, 800)
 
-const hasOpenTabs = computed(() => composeStore.openArticle.length > 0)
-const isEmpty = computed(() => !composeStore.activeArticle)
+const hasOpenTabs = computed(() => tabStore.openTabs.length > 0)
+const isEmpty = computed(() => !tabStore.activeTab)
 
-const activeSyncState = computed(() => composeStore.activeArticle?.syncState ?? 'saved')
-const activeSyncError = computed(() => composeStore.activeArticle?.syncError ?? null)
+const activeSyncState = computed(() => tabStore.activeTab?.syncState ?? 'saved')
+const activeSyncError = computed(() => tabStore.activeTab?.syncError ?? null)
+
+const diffOriginal = computed(() => tabStore.activeTab?.draft ?? '')
+const diffProposed = computed(() => tabStore.activeTab?.changes?.content ?? '')
+const showDiff = computed(() => diffProposed.value.length > 0)
 
 const draft = computed({
-  get: () => composeStore.activeArticle?.draft ?? '',
+  get: () => tabStore.activeTab?.draft ?? '',
   set: (value: string) => {
-    
-    const article = composeStore.activeArticle
-    if (!article)
+    const tab = tabStore.activeTab
+    if (!tab)
       return
-    article.draft = value
-    // 更改本篇文章时，设置为脏状态
-    composeStore.markDirty(article.id)
-    debouncedSave(article.id, value, article.title)
+    tabStore.setDraft(tab.linkedID, value)
+    debouncedSave(tab.linkedID, value, tab.title)
   },
 })
 
 onBeforeUnmount(async () => {
-  await composeStore.flushOpenTabsIfDirty()
+  await tabStore.flushOpenTabsIfDirty()
 })
 
 const syncIcon = computed(() => ({
@@ -63,11 +65,26 @@ async function handleSyncClick() {
   if (activeSyncState.value !== 'failed')
     return
 
-  const article = composeStore.activeArticle
-  if (!article?.draft)
+  const tab = tabStore.activeTab
+  if (!tab)
     return
 
-  await composeStore.saveArticle(article.id, article.draft, article.title).catch(() => {})
+  await tabStore.saveTab(tab.linkedID, tab.draft, tab.title).catch(() => {})
+}
+
+function handleAcceptChanges() {
+  const tab = tabStore.activeTab
+  if (!tab)
+    return
+  tabStore.acceptChanges(tab.linkedID)
+  debouncedSave(tab.linkedID, tab.draft, tab.title)
+}
+
+function handleRejectChanges() {
+  const tab = tabStore.activeTab
+  if (!tab)
+    return
+  tabStore.rejectChanges(tab.linkedID)
 }
 </script>
 
@@ -82,7 +99,7 @@ async function handleSyncClick() {
         <div v-if="isEmpty" class="flex flex-1 items-center justify-center text-neutral-400">
           {{ $t('compose.placeholder') }}
         </div>
-        <div v-else class="relative flex min-h-0 flex-1 flex-col p-4">
+        <div v-else class="relative flex min-h-0 flex-1 flex-col gap-2 p-4">
           <NTooltip placement="left">
             <template #trigger>
               <button
@@ -101,7 +118,35 @@ async function handleSyncClick() {
             {{ syncTip }}
           </NTooltip>
 
-          <MarkdownEditor v-model="draft" class="min-h-0 flex-1" />
+          <div class="flex min-h-0 flex-1 gap-3" :class="showDiff ? 'flex-row' : 'flex-col'">
+            <div class="flex min-h-0 min-w-0 flex-col" :class="showDiff ? 'flex-1' : 'flex-1'">
+              <div v-if="showDiff" class="mb-1 shrink-0 text-xs text-neutral-500 dark:text-neutral-400">
+                {{ $t('compose.editorMain') }}
+              </div>
+              <MarkdownEditor v-model="draft" class="min-h-0 flex-1" />
+            </div>
+
+            <div v-if="showDiff" class="flex min-h-0 min-w-0 flex-1 flex-col border-l border-neutral-200 pl-3 dark:border-neutral-700">
+              <div class="mb-1 flex shrink-0 items-center justify-between gap-2">
+                <span class="text-xs text-neutral-500 dark:text-neutral-400">
+                  {{ $t('compose.editorDiff') }}
+                </span>
+                <div class="flex items-center gap-1">
+                  <NButton size="tiny" type="primary" @click="handleAcceptChanges">
+                    {{ $t('compose.acceptChanges') }}
+                  </NButton>
+                  <NButton size="tiny" @click="handleRejectChanges">
+                    {{ $t('compose.rejectChanges') }}
+                  </NButton>
+                </div>
+              </div>
+              <DiffMarkdownEditor
+                :original="diffOriginal"
+                :proposed="diffProposed"
+                class="min-h-0 flex-1"
+              />
+            </div>
+          </div>
         </div>
       </template>
     </div>
