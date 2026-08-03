@@ -45,8 +45,12 @@ async function handleAddGroup() {
   await composeStore.createGroup('新分组')
 }
 
-function isActive(id: number) {
+function isTabOpen(id: number) {
   return tabStore.isTabOpen(id)
+}
+
+function isCurrentTab(id: number) {
+  return tabStore.activeArticleId === id
 }
 
 function handleSelect(article: Compose.Article) {
@@ -204,7 +208,10 @@ async function handleDeleteGroup(groupId: string, event?: MouseEvent) {
                 >
                   <a
                     class="relative flex items-center gap-3 px-3 py-3 break-all border rounded-md cursor-pointer hover:bg-neutral-100 group dark:border-neutral-800 dark:hover:bg-[#24272e]"
-                    :class="isActive(article.id) && ['border-[#4b9e5f]', 'bg-neutral-100', 'text-[#4b9e5f]', 'dark:bg-[#24272e]', 'dark:border-[#4b9e5f]', 'pr-14']"
+                    :class="[
+                      isCurrentTab(article.id) && ['border-[#4b9e5f]', 'bg-neutral-100', 'text-[#4b9e5f]', 'dark:bg-[#24272e]', 'dark:border-[#4b9e5f]', 'pr-14'],
+                      isTabOpen(article.id) && !isCurrentTab(article.id) && ['border-[#4b9e5f]/25', 'bg-neutral-50', 'text-neutral-500', 'dark:bg-[#1c1c20]', 'dark:border-[#4b9e5f]/20', 'dark:text-neutral-400', 'pr-14'],
+                    ]"
                     @click="handleSelect(article)"
                   >
                     <span>
@@ -213,7 +220,7 @@ async function handleDeleteGroup(groupId: string, event?: MouseEvent) {
                     <div class="relative flex-1 overflow-hidden break-all text-ellipsis whitespace-nowrap">
                       <span>{{ article.title }}</span>
                     </div>
-                    <div v-if="isActive(article.id)" class="absolute z-10 flex visible right-1">
+                    <div v-if="isTabOpen(article.id)" class="absolute z-10 flex visible right-1">
                       <NPopconfirm placement="bottom" @positive-click="handleDeleteArticle(article.id, $event)">
                         <template #trigger>
                           <button class="p-1" @click.stop>

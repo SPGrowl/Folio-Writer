@@ -1,3 +1,4 @@
+export * from './agent'
 export * from './app'
 export * from './chat'
 export * from './compose'

@@ -84,6 +84,11 @@ export default {
       modeAsk: 'Ask',
       placeholderAgent: 'Describe changes you want to make… (Shift + Enter for newline)',
       placeholderAsk: 'Ask about this document… (Shift + Enter for newline)',
+      contextGroup: 'Group',
+      contextArticle: 'Article',
+      contextNoGroup: 'Ungrouped',
+      contextNone: 'No document context bound',
+      thinking: 'Reasoning',
     },
     sync: {
       saved: 'Synced with cloud',

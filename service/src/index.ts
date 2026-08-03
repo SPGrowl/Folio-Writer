@@ -9,6 +9,7 @@ import { ensureDefaultArticleGroup } from './db/articleGroups'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
 import { registerArticleRoutes } from './routes/articles'
+import { registerAgentRoutes } from './routes/agent'
 import { registerMessageRoutes } from './routes/messages'
 import { isNotEmptyString } from './utils/is'
 import { streamChatCompletion } from './oepnai/stream'
@@ -105,6 +106,7 @@ router.post('/verify', async (req, res) => {
 
 registerMessageRoutes(router)
 registerArticleRoutes(router)
+registerAgentRoutes(router)
 
 app.use('', router)
 app.use('/api', router)

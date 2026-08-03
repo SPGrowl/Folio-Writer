@@ -87,6 +87,11 @@ export default {
       modeAsk: 'Ask',
       placeholderAgent: '描述你想对文档做的修改…（Shift + Enter 换行）',
       placeholderAsk: '就当前文档提问…（Shift + Enter 换行）',
+      contextGroup: '分组',
+      contextArticle: '文章',
+      contextNoGroup: '未分组',
+      contextNone: '未绑定文档上下文',
+      thinking: '思考过程',
     },
     sync: {
       saved: '已与云端同步',

@@ -45,5 +45,26 @@ export interface ChatProcessBody {
   extra_body?: {
     thinking?: { type: 'enabled' | 'disabled' }
   }
-  reasoning_effort?: 'high' | 'max'
+  reasoning_effort?: 'low' | 'high' | 'max'
+}
+
+/** Agent 侧栏 /agent-process 请求体 */
+export interface AgentProcessBody extends ChatProcessBody {
+  mode?: 'agent' | 'ask'
+  documentContext?: {
+    articleId: number
+    title: string
+    content: string
+    groupId: string
+    groupName: string
+    capturedAt?: string
+  } | null
+  tools?: Array<{
+    type: 'function'
+    function: {
+      name: string
+      description: string
+      parameters: Record<string, unknown>
+    }
+  }>
 }
