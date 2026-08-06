@@ -92,6 +92,12 @@ export default {
       contextNoGroup: '未分组',
       contextNone: '未绑定文档上下文',
       thinking: '思考过程',
+      sessionList: '会话列表',
+      loadingSessions: '加载会话中…',
+      toolRunning: '正在更新{target}',
+      toolDone: '已更新{target}',
+      toolError: '更新{target}失败',
+      toolDefaultTarget: '文档',
     },
     sync: {
       saved: '已与云端同步',

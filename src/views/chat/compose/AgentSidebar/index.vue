@@ -1,32 +1,44 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NButton, NInput, NSelect, NTooltip } from 'naive-ui'
 import { SvgIcon } from '@/components/common'
+import { sendAgentMessage } from '@/agent/control'
 import { useAgentStore, useAppStore } from '@/store'
+import {
+  AGENT_SIDEBAR_LAYOUT_WIDTH,
+  AGENT_SIDEBAR_MIN_EDITOR_VISIBLE,
+} from '@/store/modules/app/helper'
 import { t } from '@/locales'
-import AgentTurnList from './AgentTurnList.vue'
+import AgentStepList from './AgentStepList.vue'
+import DocumentContextBar from './DocumentContextBar.vue'
+import SessionListPopover from './SessionListPopover.vue'
 
-const MIN_WIDTH = 280
-const MAX_WIDTH = 560
+const LAYOUT_WIDTH = AGENT_SIDEBAR_LAYOUT_WIDTH
+const MIN_WIDTH = LAYOUT_WIDTH
 
 const appStore = useAppStore()
 const agentStore = useAgentStore()
+
+const rootRef = ref<HTMLElement | null>(null)
 
 const collapsed = computed(() => appStore.agentSidebarCollapsed)
 const width = computed(() => appStore.agentSidebarWidth)
 
 const prompt = ref('')
-const scrollRef = ref<HTMLElement | null>(null)
 
 const sessions = computed(() => agentStore.sessions)
 const activeSessionId = computed(() => agentStore.activeSessionId)
-const hasTurns = computed(() => agentStore.activeTurns.length > 0)
+const activeSteps = computed(() => agentStore.activeSteps)
+const hasSteps = computed(() => activeSteps.value.length > 0)
+const documentContext = computed(() => agentStore.activeSession?.documentContext ?? null)
+const showContextBar = computed(() => hasSteps.value && documentContext.value != null)
+const isRunning = computed(() => agentStore.isRunning)
+const canSend = computed(() => !isRunning.value && prompt.value.trim().length > 0)
 
 const agentMode = computed({
   get: () => agentStore.activeSession?.mode ?? 'agent',
-  set: (mode: Agent.Mode) => {
-    if (agentStore.activeSessionId != null)
-      agentStore.setMode(agentStore.activeSessionId, mode)
+  set: (mode: AgentStep.Mode) => {
+    agentStore.setMode(mode)
   },
 })
 
@@ -35,10 +47,6 @@ const modeOptions = computed(() => [
   { label: t('compose.agent.modeAsk'), value: 'ask' },
 ])
 
-const canSend = computed(() =>
-  prompt.value.trim().length > 0 && !agentStore.isRunning,
-)
-
 const inputPlaceholder = computed(() =>
   agentMode.value === 'agent'
     ? t('compose.agent.placeholderAgent')
@@ -46,20 +54,32 @@ const inputPlaceholder = computed(() =>
 )
 
 const rootStyle = computed(() => ({
-  width: collapsed.value ? '24px' : `${width.value}px`,
+  width: collapsed.value ? '24px' : `${LAYOUT_WIDTH}px`,
 }))
 
-async function scrollToBottom() {
-  await nextTick()
-  if (scrollRef.value)
-    scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+const panelStyle = computed(() => ({
+  width: `${width.value}px`,
+}))
+
+const isOverlay = computed(() => !collapsed.value && width.value > LAYOUT_WIDTH)
+
+function getMaxPanelWidth(): number {
+  const row = rootRef.value?.parentElement
+  if (!row)
+    return LAYOUT_WIDTH + 480
+  const rowWidth = row.getBoundingClientRect().width
+  return Math.max(MIN_WIDTH, rowWidth - AGENT_SIDEBAR_MIN_EDITOR_VISIBLE)
 }
 
-watch(
-  () => agentStore.activeTurns,
-  () => scrollToBottom(),
-  { deep: true },
-)
+function clampPanelWidth(value: number): number {
+  return Math.min(getMaxPanelWidth(), Math.max(MIN_WIDTH, value))
+}
+
+function syncPanelWidth() {
+  const next = clampPanelWidth(width.value)
+  if (next !== width.value)
+    appStore.setAgentSidebarWidth(next)
+}
 
 function toggleCollapsed() {
   appStore.setAgentSidebarCollapsed(!collapsed.value)
@@ -77,14 +97,13 @@ function handleCloseTab(id: number) {
   agentStore.closeSession(id)
 }
 
-async function handleSend() {
+function handleSend() {
   if (!canSend.value)
     return
 
   const text = prompt.value.trim()
   prompt.value = ''
-  await agentStore.sendMessage(text)
-  scrollToBottom()
+  sendAgentMessage(text)
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -94,13 +113,20 @@ function handleKeydown(event: KeyboardEvent) {
   handleSend()
 }
 
+const mainRef = ref<HTMLElement | null>(null)
+
+watch(activeSteps, () => {
+  requestAnimationFrame(() => {
+    mainRef.value?.scrollTo({ top: mainRef.value.scrollHeight, behavior: 'smooth' })
+  })
+}, { deep: true })
+
 let resizeStartX = 0
 let resizeStartWidth = 0
 
 function onResizeMove(event: MouseEvent) {
   const delta = resizeStartX - event.clientX
-  const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, resizeStartWidth + delta))
-  appStore.setAgentSidebarWidth(next)
+  appStore.setAgentSidebarWidth(clampPanelWidth(resizeStartWidth + delta))
 }
 
 function onResizeEnd() {
@@ -123,16 +149,22 @@ function onResizeStart(event: MouseEvent) {
   document.addEventListener('mouseup', onResizeEnd)
 }
 
+onMounted(() => {
+  syncPanelWidth()
+  window.addEventListener('resize', syncPanelWidth)
+})
+
 onUnmounted(() => {
+  window.removeEventListener('resize', syncPanelWidth)
   document.removeEventListener('mousemove', onResizeMove)
   document.removeEventListener('mouseup', onResizeEnd)
-  agentStore.abortRun()
 })
 </script>
 
 <template>
   <div
-    class="agent-sidebar-root relative flex h-full shrink-0"
+    ref="rootRef"
+    class="agent-sidebar-root relative h-full shrink-0 overflow-visible"
     :style="rootStyle"
   >
     <button
@@ -147,7 +179,9 @@ onUnmounted(() => {
 
     <aside
       v-else
-      class="agent-sidebar relative flex h-full w-full flex-col overflow-hidden border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-[#18181c]"
+      class="agent-sidebar absolute right-0 top-0 flex h-full flex-col overflow-hidden border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-[#18181c]"
+      :class="{ 'agent-sidebar--overlay': isOverlay }"
+      :style="panelStyle"
     >
       <div
         class="agent-sidebar-resizer absolute bottom-0 left-0 top-0 z-10 w-1 cursor-col-resize hover:bg-[#4b9e5f]/30"
@@ -191,6 +225,8 @@ onUnmounted(() => {
         </div>
 
         <div class="flex shrink-0 items-center gap-0.5">
+          <SessionListPopover />
+
           <NTooltip placement="bottom">
             <template #trigger>
               <button
@@ -206,17 +242,18 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <main
-        ref="scrollRef"
-        class="min-h-0 flex-1 overflow-y-auto px-3 py-4"
-      >
+      <main ref="mainRef" class="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <div
-          v-if="!hasTurns"
+          v-if="!hasSteps"
           class="flex h-full items-center justify-center text-center text-xs text-neutral-400"
         >
           {{ $t('compose.agent.emptyHint') }}
         </div>
-        <AgentTurnList v-else />
+
+        <template v-else>
+          <DocumentContextBar v-if="showContextBar" :context="documentContext!" />
+          <AgentStepList :steps="activeSteps" :is-running="isRunning" />
+        </template>
       </main>
 
       <footer class="shrink-0 border-t border-neutral-200 p-3 dark:border-neutral-800">
@@ -225,7 +262,6 @@ onUnmounted(() => {
           type="textarea"
           class="agent-sidebar-input mb-2"
           :placeholder="inputPlaceholder"
-          :disabled="agentStore.isRunning"
           :autosize="{ minRows: 2, maxRows: 6 }"
           @keydown="handleKeydown"
         />
@@ -235,7 +271,6 @@ onUnmounted(() => {
             v-model:value="agentMode"
             size="small"
             class="w-[108px]"
-            :disabled="agentStore.isRunning"
             :options="modeOptions"
           />
 
@@ -243,7 +278,7 @@ onUnmounted(() => {
             type="primary"
             size="small"
             :disabled="!canSend"
-            :loading="agentStore.isRunning"
+            :loading="isRunning"
             @click="handleSend"
           >
             <template #icon>
@@ -259,6 +294,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.agent-sidebar--overlay {
+  z-index: 30;
+  box-shadow: -8px 0 24px -4px rgb(0 0 0 / 0.12);
+}
+
+.dark .agent-sidebar--overlay {
+  box-shadow: -8px 0 28px -4px rgb(0 0 0 / 0.45);
+}
+
 .agent-sidebar-input :deep(.n-input-wrapper) {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;

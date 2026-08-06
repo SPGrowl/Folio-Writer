@@ -25,6 +25,12 @@ const languageMap: { [key: string]: Language } = {
 
 export type SiderMode = 'chat' | 'compose'
 
+/** Agent 侧栏参与 flex 布局的基础宽度（默认宽 / 拖拽下限）；超出部分 overlay */
+export const AGENT_SIDEBAR_LAYOUT_WIDTH = 300
+
+/** 侧栏拉满时留给编辑区的最小可视宽度 */
+export const AGENT_SIDEBAR_MIN_EDITOR_VISIBLE = 200
+
 export interface AppState {
   siderCollapsed: boolean
   siderMode: SiderMode
@@ -40,7 +46,7 @@ export function defaultSetting(): AppState {
     siderCollapsed: false,
     siderMode: 'chat',
     agentSidebarCollapsed: false,
-    agentSidebarWidth: 380,
+    agentSidebarWidth: AGENT_SIDEBAR_LAYOUT_WIDTH,
     theme: 'light',
     language,
     liteMode: false,
@@ -48,10 +54,11 @@ export function defaultSetting(): AppState {
 }
 
 export function getLocalSetting(): AppState {
-  // 从本地存储中读取设置
   const localSetting: AppState | undefined = ss.get(LOCAL_NAME)
-  // 覆盖属性，等价于：Object.assign({},defaultSetting(),localSetting)
-  return { ...defaultSetting(), ...localSetting }
+  const merged = { ...defaultSetting(), ...localSetting }
+  if (merged.agentSidebarWidth < AGENT_SIDEBAR_LAYOUT_WIDTH)
+    merged.agentSidebarWidth = AGENT_SIDEBAR_LAYOUT_WIDTH
+  return merged
 }
 
 // 将设置存储到本地存储中

@@ -89,8 +89,8 @@ function handleRejectChanges() {
 </script>
 
 <template>
-  <div class="flex h-full min-w-0">
-    <div class="relative flex min-w-0 flex-1 flex-col">
+  <div class="relative flex h-full min-w-0">
+    <div class="relative z-0 flex min-w-0 flex-1 flex-col">
       <div v-if="!hasOpenTabs" class="flex h-full items-center justify-center text-neutral-400">
         {{ $t('compose.placeholder') }}
       </div>

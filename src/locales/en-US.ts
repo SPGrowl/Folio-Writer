@@ -89,6 +89,12 @@ export default {
       contextNoGroup: 'Ungrouped',
       contextNone: 'No document context bound',
       thinking: 'Reasoning',
+      sessionList: 'Sessions',
+      loadingSessions: 'Loading sessions…',
+      toolRunning: 'Updating {target}…',
+      toolDone: 'Updated {target}',
+      toolError: 'Failed to update {target}',
+      toolDefaultTarget: 'document',
     },
     sync: {
       saved: 'Synced with cloud',
