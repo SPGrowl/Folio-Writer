@@ -7,7 +7,7 @@ declare namespace Agent {
   type ToolStatus = 'calling' | 'done' | 'failed'
 
   /** 首轮发送时冻结的文档上下文（含文章与分组） */
-  interface DocumentContext {
+  interface initialContext {
     articleId: number
     title: string
     content: string
@@ -69,7 +69,7 @@ declare namespace Agent {
     title: string
     mode: Mode
     turns: Turn[]
-    documentContext: DocumentContext | null
+    documentContext: initialContext | null
     createTime: string
   }
 

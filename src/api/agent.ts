@@ -25,30 +25,30 @@ export const AGENT_TOOL_DEFINITIONS: AgentApi.ToolDefinition[] = [
   },
 ]
 
-export interface BuildAgentRequestParams {
+export interface initRequest {
   mode: Agent.Mode
   messages: AgentApi.Message[]
-  documentContext?: Agent.DocumentContext | null
+  initialContext?: Agent.initialContext | null
   /** 为 true 时在请求体中携带 AGENT_TOOL_DEFINITIONS */
   enableTools?: boolean
 }
 
 /** 组装 Agent 专用请求体 */
-export function buildAgentCompletionRequest(params: BuildAgentRequestParams): AgentApi.CompletionRequest {
+export function buildInitialRequest(params: initRequest): AgentApi.CompletionRequest {
   const settingStore = useSettingStore()
 
   const request: AgentApi.CompletionRequest = {
     mode: params.mode,
     model: settingStore.modelName,
     messages: params.messages,
-    documentContext: params.documentContext
+    documentContext: params.initialContext
       ? {
-          articleId: params.documentContext.articleId,
-          title: params.documentContext.title,
-          content: params.documentContext.content,
-          groupId: params.documentContext.groupId,
-          groupName: params.documentContext.groupName,
-          capturedAt: params.documentContext.capturedAt,
+          articleId: params.initialContext.articleId,
+          title: params.initialContext.title,
+          content: params.initialContext.content,
+          groupId: params.initialContext.groupId,
+          groupName: params.initialContext.groupName,
+          capturedAt: params.initialContext.capturedAt,
         }
       : null,
     temperature: settingStore.temperature,
@@ -56,6 +56,7 @@ export function buildAgentCompletionRequest(params: BuildAgentRequestParams): Ag
     extra_body: {
       thinking: { type: 'enabled' },
     },
+    // TODO：思考力度可配置
     reasoning_effort: 'high',
     stream: true,
   }
@@ -76,9 +77,9 @@ export function streamAgentCompletion(
 
 /** 便捷方法：由 store 传入 messages 后直接流式请求 */
 export function streamAgentTurn(
-  params: BuildAgentRequestParams,
+  params: initRequest,
   options: AgentStreamOptions,
 ) {
-  const request = buildAgentCompletionRequest(params)
+  const request = buildInitialRequest(params)
   return streamAgentCompletion(request, options)
 }

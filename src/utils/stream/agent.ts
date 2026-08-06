@@ -11,6 +11,7 @@ export interface AgentStreamOptions {
  * Agent 专用 SSE 流解析：透传 finish_reason，支持 tool_calls 分片。
  * 与 chat 的 streamChatProcess 分离，便于后续扩展 agent loop。
  */
+// 解析流
 export async function streamAgentProcess(
   body: AgentApi.CompletionRequest,
   options: AgentStreamOptions,

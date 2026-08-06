@@ -94,7 +94,7 @@ export const useAgentStore = defineStore('agent-store', {
       session.mode = mode
     },
 
-    initContext(): Agent.DocumentContext | null {
+    initContext(): Agent.initialContext | null {
       const tab = useComposeTabStore().activeTab
       if (!tab)
         return null
@@ -227,16 +227,19 @@ export const useAgentStore = defineStore('agent-store', {
       let messages = this.composeRequest(sessionId, turnIndex)
       turn.apiTrace = []
 
+      // agent loop
       while (true) {
         const step = getCurrentRunStep(turn.run)
         const pending = createPendingAssistant()
         let finishReason: AgentApi.FinishReason = null
 
+
+        // 拉取SSE信息
         await streamAgentTurn(
           {
             mode: session.mode,
             messages,
-            documentContext: session.documentContext,
+            initialContext: session.documentContext,
             enableTools: session.mode === 'agent',
           },
           {
@@ -261,8 +264,11 @@ export const useAgentStore = defineStore('agent-store', {
           },
         )
 
+
+        // 获取最终本轮对话信息的引用
         const assistantMsg = finalizeAssistantMessage(pending)
         messages = [...messages, assistantMsg]
+        // 存入本轮的思维链与工具情况
         turn.apiTrace.push(assistantMsg)
 
         const needsToolRun = (finishReason === 'tool_calls' || assistantMsg.tool_calls?.length)
@@ -275,6 +281,7 @@ export const useAgentStore = defineStore('agent-store', {
 
         turn.run.status = 'tool_running'
 
+        // 遍历工具调用列表
         for (const tc of assistantMsg.tool_calls!) {
           let inv = step.invocations.find(item => item.id === tc.id)
           if (!inv) {
@@ -289,6 +296,7 @@ export const useAgentStore = defineStore('agent-store', {
           }
 
           try {
+            // 根据工具名与函数执行工具，并拿到执行结果
             const { payload, paramsSummary, resultSummary } = executeAgentTool(
               tc.function.name,
               tc.function.arguments,
