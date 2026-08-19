@@ -54,7 +54,6 @@ export interface AgentProcessBody extends ChatProcessBody {
   documentContext?: {
     articleId: number
     title: string
-    content: string
     groupId: string
     groupName: string
     capturedAt?: string

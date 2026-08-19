@@ -101,12 +101,12 @@ const extensions = computed(() => [
   width: 100%;
   height: 100%;
   outline: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(248, 113, 113, 0.45);
   border-radius: 6px;
 }
 
 .dark .diff-markdown-editor :deep(.cm-editor) {
-  border-color: #3f3f46;
+  border-color: rgba(248, 113, 113, 0.35);
 }
 
 .diff-markdown-editor :deep(.cm-scroller) {

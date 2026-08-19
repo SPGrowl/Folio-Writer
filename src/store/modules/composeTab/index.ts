@@ -1,5 +1,9 @@
 import { defineStore } from 'pinia'
 import { ApiError } from '@/utils/request'
+import {
+  markPendingToolSuperseded,
+  patchToolStepReviewStatus,
+} from '@/agent/review/syncToolReviewStatus'
 import { useComposeStore } from '../compose'
 import {
   collectPreservedTabs,
@@ -8,8 +12,13 @@ import {
   findTabById,
   getLocalTabState,
   mergeTabOnBootstrap,
+  migrateLegacyTabChanges,
   setLocalTabUi,
 } from './helper'
+
+function hasChangePayload(change?: Compose.ArticleChange): boolean {
+  return Boolean(change?.content != null && change.content !== '')
+}
 
 export const useComposeTabStore = defineStore('compose-tab-store', {
   state: (): Compose.TabState => ({
@@ -33,6 +42,17 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
     isTabOpen(state: Compose.TabState) {
       return (id: number) => state.openTabs.includes(id)
     },
+
+    hasPendingChanges(state: Compose.TabState) {
+      return (id: number) => hasChangePayload(state.articleChanges[id])
+    },
+
+    getChanges(state: Compose.TabState) {
+      return (id: number): Compose.ArticleChange | undefined => {
+        const change = state.articleChanges[id]
+        return hasChangePayload(change) ? change : undefined
+      }
+    },
   },
 
   actions: {
@@ -44,6 +64,7 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       setLocalTabUi({
         openTabs: this.openTabs,
         activeArticleId: this.activeArticleId,
+        articleChanges: this.articleChanges,
       })
     },
 
@@ -52,7 +73,6 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       this.recordUiState()
     },
 
-    /** 编辑 draft 时标记该页签 dirty */
     markDirty(id: number) {
       const tab = this.findTab(id)
       if (!tab || tab.syncState === 'loading')
@@ -68,36 +88,84 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       this.markDirty(id)
     },
 
-    setChanges(id: number, changes: Compose.TabChanges) {
-      const tab = this.findTab(id)
-      if (!tab)
-        return
-      tab.changes = changes
+    /** Agent 写工具：写入全局 articleChanges（单槽，新推送覆盖旧稿） */
+    applyAgentChanges(
+      id: number,
+      content: string,
+      source?: Pick<Compose.ArticleChange, 'sourceToolStepIndex' | 'sourceSessionId'>,
+    ) {
+      const composeStore = useComposeStore()
+      if (!composeStore.findArticle(id))
+        throw new Error(`文章 ${id} 不存在`)
+
+      const existing = this.getChanges(id)
+      if (existing?.sourceToolStepIndex != null) {
+        markPendingToolSuperseded(
+          existing.sourceSessionId,
+          existing.sourceToolStepIndex,
+        )
+      }
+
+      this.articleChanges[id] = {
+        content,
+        ...source,
+      }
+
+      this.recordUiState()
     },
 
     clearChanges(id: number) {
-      const tab = this.findTab(id)
-      if (!tab)
+      if (!(id in this.articleChanges))
         return
-      delete tab.changes
+      delete this.articleChanges[id]
+      this.recordUiState()
     },
 
-    /** 采纳 LLM 变更：将 changes.content 写入 draft 并清除 changes */
-    acceptChanges(id: number) {
-      const tab = this.findTab(id)
-      if (!tab?.changes?.content)
-        return
-      tab.draft = tab.changes.content
-      this.markDirty(id)
-      delete tab.changes
-    },
-
-    /** 拒绝 LLM 变更：清除 changes */
-    rejectChanges(id: number) {
+    clearPendingChanges(id: number) {
       this.clearChanges(id)
     },
 
-    /** 打开文章：未在 openTabs 则从 Article 创建 Tab；设为活跃 */
+    /** 采纳：写入 draft（或 Article 内存），并从 map 移除 */
+    acceptChanges(id: number) {
+      const changes = this.getChanges(id)
+      if (!changes)
+        return
+
+      patchToolStepReviewStatus(
+        changes.sourceSessionId,
+        changes.sourceToolStepIndex,
+        'accepted',
+      )
+
+      delete this.articleChanges[id]
+
+      const tab = this.findTab(id)
+      if (tab) {
+        tab.draft = changes.content
+        this.markDirty(id)
+      }
+      else {
+        const article = useComposeStore().findArticle(id)
+        if (article)
+          article.content = changes.content
+      }
+
+      this.recordUiState()
+    },
+
+    /** 拒绝：回写 tool 状态并从 map 移除 */
+    rejectChanges(id: number) {
+      const changes = this.getChanges(id)
+
+      patchToolStepReviewStatus(
+        changes?.sourceSessionId,
+        changes?.sourceToolStepIndex,
+        'rejected',
+      )
+
+      this.clearChanges(id)
+    },
+
     openTab(id: number) {
       const composeStore = useComposeStore()
       const article = composeStore.findArticle(id)
@@ -112,14 +180,12 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       this.setActive(id)
     },
 
-    /** 切换页签：仅更新 activeArticleId */
     switchTab(id: number) {
       if (!this.openTabs.includes(id))
         return
       this.setActive(id)
     },
 
-    /** 关闭页签：未 saved 则同步 draft 到云端，随后移除 Tab */
     async closeTab(id: number) {
       const index = this.openTabs.indexOf(id)
       if (index === -1)
@@ -147,7 +213,6 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       }
     },
 
-    /** 将 draft 同步到云端，并更新 Article 与 Tab 状态 */
     async saveTab(id: number, content: string, title?: string) {
       const composeStore = useComposeStore()
       const article = composeStore.findArticle(id)
@@ -174,10 +239,13 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       }
     },
 
-    /** compose bootstrap 完成后重建 tabs */
     reconcileAfterBootstrap(articles: Compose.Article[]) {
       const preserved = collectPreservedTabs(this.$state)
       const openIds = [...this.openTabs]
+      let articleChanges = migrateLegacyTabChanges(
+        preserved,
+        { ...this.articleChanges },
+      )
 
       const nextTabs: Record<number, Compose.Tab> = {}
       for (const article of articles) {
@@ -189,6 +257,7 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       const filteredOpen = openIds.filter(id => nextTabs[id] != null)
       this.tabs = nextTabs
       this.openTabs = filteredOpen
+      this.articleChanges = articleChanges
 
       if (filteredOpen.length === 0) {
         this.activeArticleId = null
@@ -203,8 +272,9 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       this.recordUiState()
     },
 
-    /** 关闭指定文章的页签（删除文章时） */
     async closeTabIfOpen(id: number) {
+      this.clearChanges(id)
+
       if (!this.openTabs.includes(id))
         return
 
@@ -226,7 +296,6 @@ export const useComposeTabStore = defineStore('compose-tab-store', {
       }
     },
 
-    /** 离开页面前保存所有未同步的打开页签 */
     async flushOpenTabsIfDirty() {
       for (const id of [...this.openTabs]) {
         const tab = this.findTab(id)

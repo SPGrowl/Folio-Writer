@@ -68,6 +68,10 @@ export default {
     newGroupButton: '新建分组',
     defaultGroup: '默认分组',
     renameGroup: '重命名分组',
+    renameArticle: '重命名',
+    moveArticle: '移动到其他组',
+    articleHistory: '历史版本',
+    comingSoon: '即将推出',
     deleteGroupConfirm: '确定删除该分组？组内文章将移至默认分组。',
     deleteArticleConfirm: '确定删除该文本？',
     placeholder: '选择一个文本开始创作，或新建文本',
@@ -98,6 +102,39 @@ export default {
       toolDone: '已更新{target}',
       toolError: '更新{target}失败',
       toolDefaultTarget: '文档',
+      tools: {
+        list_group_articles: {
+          running: '正在查看《{groupName}》组中 {count} 篇文章的目录',
+          done: '已查看《{groupName}》组 {count} 篇文章的目录',
+          error: '查看《{groupName}》组文章目录失败',
+        },
+        get_article_content: {
+          running: '正在阅读《{title}》的内容',
+          done: '已阅读《{title}》，共 {count} 字',
+          doneWithPending: '已阅读《{title}》（draft {count} 字，含待审改动）',
+          error: '阅读《{title}》失败',
+        },
+        get_article_word_count: {
+          running: '正在统计《{title}》的字数',
+          done: '已统计《{title}》的字数，共 {count} 字',
+          error: '统计《{title}》字数失败',
+        },
+        get_group_articles: {
+          running: '正在阅读《{groupName}》组中 {count} 篇文章的内容',
+          done: '已阅读《{groupName}》组 {count} 篇文章的内容',
+          error: '阅读《{groupName}》组文章失败',
+        },
+        update_article_content: {
+          running: '正在提交《{title}》的修改建议',
+          done: '已提交《{title}》的修改建议，待用户审阅',
+          error: '提交《{title}》修改建议失败',
+        },
+        create_article: {
+          running: '正在创建文章《{title}》',
+          done: '已创建文章《{title}》',
+          error: '创建文章《{title}》失败',
+        },
+      },
     },
     sync: {
       saved: '已与云端同步',

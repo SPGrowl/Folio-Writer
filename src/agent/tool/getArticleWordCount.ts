@@ -1,12 +1,35 @@
-import { useComposeStore, useComposeTabStore } from '@/store'
-import { countMarkdownChars } from './countMarkdownChars'
+import { t } from '@/locales'
+import {
+  readArticleSnapshot,
+  resolveArticleId,
+  resolveArticleTitle,
+} from './articleSource'
 
-function resolveArticleId(args: Record<string, unknown>): number {
-  const raw = args.article_id ?? args.articleId
-  const id = typeof raw === 'number' ? raw : Number(raw)
-  if (!Number.isFinite(id))
-    throw new Error('article_id 无效')
-  return id
+export function formatRunningGetArticleWordCount(
+  args: Record<string, unknown>,
+  ctx: AgentStep.InitialContext | null,
+): string {
+  return t('compose.agent.tools.get_article_word_count.running', {
+    title: resolveArticleTitle(args, ctx),
+  })
+}
+
+export function formatDoneGetArticleWordCount(
+  _args: Record<string, unknown>,
+  result: AgentStep.ToolExecuteResult,
+): string {
+  const title = String(result.payload.title ?? t('compose.untitled'))
+  const count = Number(result.payload.wordCount ?? 0)
+  return t('compose.agent.tools.get_article_word_count.done', { title, count })
+}
+
+export function formatErrorGetArticleWordCount(
+  args: Record<string, unknown>,
+  ctx: AgentStep.InitialContext | null,
+): string {
+  return t('compose.agent.tools.get_article_word_count.error', {
+    title: resolveArticleTitle(args, ctx),
+  })
 }
 
 /** 根据文章 ID 统计字数（优先使用已打开页签的 draft） */
@@ -14,46 +37,13 @@ export function executeGetArticleWordCount(
   args: Record<string, unknown>,
 ): AgentStep.ToolExecuteResult {
   const articleId = resolveArticleId(args)
-  const composeStore = useComposeStore()
-  const tabStore = useComposeTabStore()
-
-  const article = composeStore.findArticle(articleId)
-  if (!article)
-    throw new Error(`文章 ${articleId} 不存在`)
-
-  const tab = tabStore.findTab(articleId)
-  const content = tab?.draft ?? article.content
-  const title = tab?.title ?? article.title
-  const wordCount = countMarkdownChars(content)
+  const snapshot = readArticleSnapshot(articleId)
 
   return {
     payload: {
-      articleId,
-      title,
-      wordCount,
+      articleId: snapshot.articleId,
+      title: snapshot.title,
+      wordCount: snapshot.wordCount,
     },
-    msg: `《${title}》`,
   }
-}
-
-export function msgGetArticleWordCount(
-  args: Record<string, unknown>,
-  ctx: AgentStep.InitialContext | null,
-): string {
-  const composeStore = useComposeStore()
-  const tabStore = useComposeTabStore()
-
-  const articleId = resolveArticleId(args)
-  const tab = tabStore.findTab(articleId)
-  if (tab?.title)
-    return `《${tab.title}》`
-
-  const article = composeStore.findArticle(articleId)
-  if (article?.title)
-    return `《${article.title}》`
-
-  if (ctx?.articleId === articleId && ctx.title)
-    return `《${ctx.title}》`
-
-  return `文章 ${articleId}`
 }

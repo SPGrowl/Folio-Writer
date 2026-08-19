@@ -15,6 +15,25 @@ function isTabDirty(tab: Compose.Tab) {
   return tab.syncState !== 'saved'
 }
 
+function hasChanges(id: number) {
+  return tabStore.hasPendingChanges(id)
+}
+
+function tabClass(tab: Compose.Tab) {
+  const active = isActive(tab.linkedID)
+  const pending = hasChanges(tab.linkedID)
+
+  if (pending) {
+    return active
+      ? 'border-red-300 bg-white text-red-600 dark:border-red-700/80 dark:bg-[#18181c] dark:text-red-400'
+      : 'border-transparent bg-transparent text-red-500 hover:bg-red-50/80 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300'
+  }
+
+  return active
+    ? 'border-neutral-200 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-[#18181c] dark:text-neutral-100'
+    : 'border-transparent bg-transparent text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-700 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-300'
+}
+
 function handleSelect(id: number) {
   tabStore.switchTab(id)
 }
@@ -32,9 +51,7 @@ async function handleClose(id: number, event: MouseEvent) {
       :key="tab.linkedID"
       type="button"
       class="group relative flex max-w-[180px] shrink-0 items-center gap-1.5 rounded-t-md border border-b-0 px-3 py-2 text-xs transition"
-      :class="isActive(tab.linkedID)
-        ? 'border-neutral-200 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-[#18181c] dark:text-neutral-100'
-        : 'border-transparent bg-transparent text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-700 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-300'"
+      :class="tabClass(tab)"
       @click="handleSelect(tab.linkedID)"
     >
       <SvgIcon icon="ri:file-text-line" class="shrink-0 text-sm" />
@@ -47,7 +64,11 @@ async function handleClose(id: number, event: MouseEvent) {
         <SvgIcon icon="ri:close-line" class="text-xs" />
       </span>
       <span
-        v-if="isTabDirty(tab)"
+        v-if="hasChanges(tab.linkedID)"
+        class="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500"
+      />
+      <span
+        v-else-if="isTabDirty(tab)"
         class="h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400"
       />
     </button>

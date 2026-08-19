@@ -1,18 +1,47 @@
 <script setup lang='ts'>
-import { computed, onMounted, ref } from 'vue'
-import { NButton, NInput, NPopconfirm, NScrollbar } from 'naive-ui'
+import { computed, h, onMounted, ref } from 'vue'
+import { NButton, NDropdown, NInput, NPopconfirm, NScrollbar, useDialog, type DropdownOption } from 'naive-ui'
 import { SvgIcon } from '@/components/common'
 import { useAppStore, useComposeStore, useComposeTabStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
+import { t } from '@/locales'
 
 const appStore = useAppStore()
 const composeStore = useComposeStore()
 const tabStore = useComposeTabStore()
 const { isMobile } = useBasicLayout()
+const dialog = useDialog()
 
 const editingGroupId = ref<string | null>(null)
 const editingGroupName = ref('')
+const editingArticleId = ref<number | null>(null)
+const editingArticleTitle = ref('')
 const collapsedGroups = ref<Set<string>>(new Set())
+
+const articleMenuOptions = computed<DropdownOption[]>(() => [
+  {
+    label: t('compose.renameArticle'),
+    key: 'rename',
+  },
+  {
+    label: `${t('compose.moveArticle')}（${t('compose.comingSoon')}）`,
+    key: 'move',
+    disabled: true,
+  },
+  {
+    label: `${t('compose.articleHistory')}（${t('compose.comingSoon')}）`,
+    key: 'history',
+    disabled: true,
+  },
+  {
+    type: 'divider',
+    key: 'divider',
+  },
+  {
+    label: () => h('span', { class: 'text-red-500' }, t('common.delete')),
+    key: 'delete',
+  },
+])
 
 onMounted(() => {
   composeStore.bootstrap()
@@ -53,15 +82,84 @@ function isCurrentTab(id: number) {
   return tabStore.activeArticleId === id
 }
 
+function hasChanges(id: number) {
+  return tabStore.hasPendingChanges(id)
+}
+
+function articleClass(article: Compose.Article) {
+  const current = isCurrentTab(article.id)
+  const open = isTabOpen(article.id)
+  const pending = hasChanges(article.id)
+  const editing = editingArticleId.value === article.id
+
+  if (pending) {
+    return [
+      current && ['border-red-400', 'bg-red-50', 'text-red-600', 'dark:bg-red-950/20', 'dark:border-red-500/70', 'dark:text-red-400', 'pr-10'],
+      open && !current && ['border-red-300/60', 'bg-red-50/50', 'text-red-500', 'dark:bg-red-950/10', 'dark:border-red-500/30', 'dark:text-red-400', 'pr-10'],
+      !open && !current && ['border-red-200', 'text-red-500', 'dark:border-red-500/25', 'dark:text-red-400'],
+      editing && 'pr-10',
+    ]
+  }
+
+  return [
+    current && ['border-[#4b9e5f]', 'bg-neutral-100', 'text-[#4b9e5f]', 'dark:bg-[#24272e]', 'dark:border-[#4b9e5f]', 'pr-10'],
+    open && !current && ['border-[#4b9e5f]/25', 'bg-neutral-50', 'text-neutral-500', 'dark:bg-[#1c1c20]', 'dark:border-[#4b9e5f]/20', 'dark:text-neutral-400', 'pr-10'],
+    editing && 'pr-10',
+  ]
+}
+
 function handleSelect(article: Compose.Article) {
+  if (editingArticleId.value === article.id)
+    return
   tabStore.openTab(article.id)
   if (isMobile.value)
     appStore.setSiderCollapsed(true)
 }
 
-async function handleDeleteArticle(id: number, event?: MouseEvent | TouchEvent) {
-  event?.stopPropagation()
-  await composeStore.removeArticle(id)
+function getArticleTitle(article: Compose.Article) {
+  const tab = tabStore.findTab(article.id)
+  return tab?.title ?? article.title
+}
+
+function startEditArticle(article: Compose.Article) {
+  editingArticleId.value = article.id
+  editingArticleTitle.value = getArticleTitle(article)
+}
+
+async function saveEditArticle(articleId: number) {
+  const title = editingArticleTitle.value.trim()
+  const current = getArticleTitle(composeStore.findArticle(articleId)!)
+  if (title && title !== current)
+    await composeStore.renameArticle(articleId, title)
+  editingArticleId.value = null
+}
+
+function cancelEditArticle() {
+  editingArticleId.value = null
+}
+
+function handleArticleTitleKeydown(articleId: number, event: KeyboardEvent) {
+  event.stopPropagation()
+  if (event.key === 'Enter')
+    saveEditArticle(articleId)
+  else if (event.key === 'Escape')
+    cancelEditArticle()
+}
+
+function handleArticleMenuSelect(article: Compose.Article, key: string) {
+  if (key === 'rename') {
+    startEditArticle(article)
+    return
+  }
+  if (key === 'delete') {
+    dialog.warning({
+      title: t('common.delete'),
+      content: t('compose.deleteArticleConfirm'),
+      positiveText: t('common.confirm'),
+      negativeText: t('bubble.cancel'),
+      onPositiveClick: () => composeStore.removeArticle(article.id),
+    })
+  }
 }
 
 function startEditGroup(group: Compose.ArticleGroup, event?: MouseEvent) {
@@ -207,28 +305,48 @@ async function handleDeleteGroup(groupId: string, event?: MouseEvent) {
                   :key="article.id"
                 >
                   <a
-                    class="relative flex items-center gap-3 px-3 py-3 break-all border rounded-md cursor-pointer hover:bg-neutral-100 group dark:border-neutral-800 dark:hover:bg-[#24272e]"
-                    :class="[
-                      isCurrentTab(article.id) && ['border-[#4b9e5f]', 'bg-neutral-100', 'text-[#4b9e5f]', 'dark:bg-[#24272e]', 'dark:border-[#4b9e5f]', 'pr-14'],
-                      isTabOpen(article.id) && !isCurrentTab(article.id) && ['border-[#4b9e5f]/25', 'bg-neutral-50', 'text-neutral-500', 'dark:bg-[#1c1c20]', 'dark:border-[#4b9e5f]/20', 'dark:text-neutral-400', 'pr-14'],
-                    ]"
+                    class="group/article relative flex items-center gap-3 px-3 py-3 break-all border rounded-md cursor-pointer hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-[#24272e] group-hover/article:pr-10"
+                    :class="articleClass(article)"
                     @click="handleSelect(article)"
                   >
                     <span>
                       <SvgIcon icon="ri:file-text-line" />
                     </span>
                     <div class="relative flex-1 overflow-hidden break-all text-ellipsis whitespace-nowrap">
-                      <span>{{ article.title }}</span>
+                      <NInput
+                        v-if="editingArticleId === article.id"
+                        v-model:value="editingArticleTitle"
+                        size="tiny"
+                        @click.stop
+                        @keydown="handleArticleTitleKeydown(article.id, $event)"
+                        @blur="saveEditArticle(article.id)"
+                      />
+                      <span v-else class="flex items-center gap-2">
+                        <span class="truncate">{{ getArticleTitle(article) }}</span>
+                        <span
+                          v-if="hasChanges(article.id)"
+                          class="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500"
+                        />
+                      </span>
                     </div>
-                    <div v-if="isTabOpen(article.id)" class="absolute z-10 flex visible right-1">
-                      <NPopconfirm placement="bottom" @positive-click="handleDeleteArticle(article.id, $event)">
-                        <template #trigger>
-                          <button class="p-1" @click.stop>
-                            <SvgIcon icon="ri:delete-bin-line" />
-                          </button>
-                        </template>
-                        {{ $t('compose.deleteArticleConfirm') }}
-                      </NPopconfirm>
+                    <div
+                      class="absolute z-10 flex right-1 transition"
+                      :class="editingArticleId === article.id ? 'visible opacity-100' : 'opacity-0 group-hover/article:opacity-100'"
+                      @click.stop
+                    >
+                      <NDropdown
+                        trigger="click"
+                        placement="bottom-end"
+                        :options="articleMenuOptions"
+                        @select="handleArticleMenuSelect(article, $event as string)"
+                      >
+                        <button
+                          class="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                          :title="$t('common.action')"
+                        >
+                          <SvgIcon icon="ri:more-2-fill" />
+                        </button>
+                      </NDropdown>
                     </div>
                   </a>
                 </div>

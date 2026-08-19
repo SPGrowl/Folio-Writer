@@ -6,11 +6,12 @@ import ComposeTabs from '@/views/chat/compose/ComposeTabs.vue'
 import MarkdownEditor from '@/components/custom/MarkdownEditor/index.vue'
 import DiffMarkdownEditor from '@/components/custom/DiffMarkdownEditor/index.vue'
 import { SvgIcon } from '@/components/common'
-import { useComposeTabStore } from '@/store'
+import { useComposeStore, useComposeTabStore } from '@/store'
 import { debounce } from '@/utils/functions/debounce'
 import { t } from '@/locales'
 
 const tabStore = useComposeTabStore()
+const composeStore = useComposeStore()
 
 const debouncedSave = debounce((id: number, value: string, title: string) => {
   tabStore.saveTab(id, value, title).catch(() => {})
@@ -22,8 +23,22 @@ const isEmpty = computed(() => !tabStore.activeTab)
 const activeSyncState = computed(() => tabStore.activeTab?.syncState ?? 'saved')
 const activeSyncError = computed(() => tabStore.activeTab?.syncError ?? null)
 
-const diffOriginal = computed(() => tabStore.activeTab?.draft ?? '')
-const diffProposed = computed(() => tabStore.activeTab?.changes?.content ?? '')
+const diffOriginal = computed(() => {
+  const id = tabStore.activeArticleId
+  if (id == null)
+    return ''
+  const tab = tabStore.activeTab
+  if (tab)
+    return tab.draft
+  return composeStore.findArticle(id)?.content ?? ''
+})
+const activeChanges = computed(() => {
+  const id = tabStore.activeArticleId
+  if (id == null)
+    return undefined
+  return tabStore.getChanges(id)
+})
+const diffProposed = computed(() => activeChanges.value?.content ?? '')
 const showDiff = computed(() => diffProposed.value.length > 0)
 
 const draft = computed({
@@ -73,18 +88,20 @@ async function handleSyncClick() {
 }
 
 function handleAcceptChanges() {
-  const tab = tabStore.activeTab
-  if (!tab)
+  const id = tabStore.activeArticleId
+  if (id == null)
     return
-  tabStore.acceptChanges(tab.linkedID)
-  debouncedSave(tab.linkedID, tab.draft, tab.title)
+  tabStore.acceptChanges(id)
+  const tab = tabStore.activeTab
+  if (tab)
+    debouncedSave(tab.linkedID, tab.draft, tab.title)
 }
 
 function handleRejectChanges() {
-  const tab = tabStore.activeTab
-  if (!tab)
+  const id = tabStore.activeArticleId
+  if (id == null)
     return
-  tabStore.rejectChanges(tab.linkedID)
+  tabStore.rejectChanges(id)
 }
 </script>
 
@@ -126,9 +143,9 @@ function handleRejectChanges() {
               <MarkdownEditor v-model="draft" class="min-h-0 flex-1" />
             </div>
 
-            <div v-if="showDiff" class="flex min-h-0 min-w-0 flex-1 flex-col border-l border-neutral-200 pl-3 dark:border-neutral-700">
+            <div v-if="showDiff" class="flex min-h-0 min-w-0 flex-1 flex-col border-l border-red-200 pl-3 dark:border-red-500/30">
               <div class="mb-1 flex shrink-0 items-center justify-between gap-2">
-                <span class="text-xs text-neutral-500 dark:text-neutral-400">
+                <span class="text-xs font-medium text-red-600 dark:text-red-400">
                   {{ $t('compose.editorDiff') }}
                 </span>
                 <div class="flex items-center gap-1">

@@ -35,8 +35,11 @@ export async function runTurn(signal: AbortSignal) {
 
       let result: AgentStep.StreamTurnResult
       try {
+
+        // 等待一条完整的助手消息
         result = await streamOneTurn(buildRequest(session), {
           signal,
+          // 更新助手端的信息
           onPatch: patch => store.patchStepAt(assistantIndex, patch),
         })
       }
@@ -64,6 +67,9 @@ export async function runTurn(signal: AbortSignal) {
         && (result.message.tool_calls?.length ?? 0) > 0
 
       if (!needsTools)
+        break
+
+      if (signal.aborted || !store.isRunning)
         break
 
       const finalized = store.activeSteps[assistantIndex]

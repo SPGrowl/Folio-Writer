@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NButton, NInput, NSelect, NTooltip } from 'naive-ui'
 import { SvgIcon } from '@/components/common'
-import { sendAgentMessage } from '@/agent/control'
+import { abortAgentMessage, sendAgentMessage } from '@/agent/control'
 import { useAgentStore, useAppStore } from '@/store'
 import {
   AGENT_SIDEBAR_LAYOUT_WIDTH,
@@ -104,6 +104,12 @@ function handleSend() {
   const text = prompt.value.trim()
   prompt.value = ''
   sendAgentMessage(text)
+}
+
+function handlePause() {
+  if (!isRunning.value)
+    return
+  abortAgentMessage()
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -275,10 +281,10 @@ onUnmounted(() => {
           />
 
           <NButton
+            v-if="!isRunning"
             type="primary"
             size="small"
             :disabled="!canSend"
-            :loading="isRunning"
             @click="handleSend"
           >
             <template #icon>
@@ -287,6 +293,19 @@ onUnmounted(() => {
               </span>
             </template>
           </NButton>
+
+          <NTooltip v-else placement="top">
+            <template #trigger>
+              <NButton type="primary" size="small" @click="handlePause">
+                <template #icon>
+                  <span class="dark:text-black">
+                    <SvgIcon icon="famicons:stop-circle" />
+                  </span>
+                </template>
+              </NButton>
+            </template>
+            {{ t('tooltip.stop') }}
+          </NTooltip>
         </div>
       </footer>
     </aside>

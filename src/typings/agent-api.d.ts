@@ -2,11 +2,10 @@ declare namespace AgentApi {
 
   type Mode = 'agent' | 'ask'
 
-  /** 发往 /agent-process 的文档上下文（与 store 快照结构一致） */
+  /** 发往 /agent-process 的文档上下文（仅元数据，不含正文） */
   interface DocumentContextPayload {
     articleId: number
     title: string
-    content: string
     groupId: string
     groupName: string
     capturedAt?: string

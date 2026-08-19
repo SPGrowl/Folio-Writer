@@ -23,7 +23,6 @@ export function syncDocumentContextFromActiveTab() {
   store.setDocumentContext({
     articleId: tab.linkedID,
     title: tab.title || article.title,
-    content: tab.draft ?? article.content,
     groupId: article.linkedGroup,
     groupName: group?.name ?? '',
     capturedAt: new Date().toISOString(),

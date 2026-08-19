@@ -44,7 +44,6 @@ export function buildRequest(session: AgentStep.Session): AgentApi.CompletionReq
       ? {
           articleId: session.documentContext.articleId,
           title: session.documentContext.title,
-          content: session.documentContext.content,
           groupId: session.documentContext.groupId,
           groupName: session.documentContext.groupName,
           capturedAt: session.documentContext.capturedAt,

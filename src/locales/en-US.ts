@@ -65,6 +65,10 @@ export default {
     newGroupButton: 'New Group',
     defaultGroup: 'Default',
     renameGroup: 'Rename group',
+    renameArticle: 'Rename',
+    moveArticle: 'Move to group',
+    articleHistory: 'Version history',
+    comingSoon: 'Coming soon',
     deleteGroupConfirm: 'Delete this group? Articles will be moved to the default group.',
     deleteArticleConfirm: 'Are you sure to delete this text?',
     placeholder: 'Select a text to start composing, or create a new one',
@@ -95,6 +99,39 @@ export default {
       toolDone: 'Updated {target}',
       toolError: 'Failed to update {target}',
       toolDefaultTarget: 'document',
+      tools: {
+        list_group_articles: {
+          running: 'Listing {count} article(s) in group "{groupName}"…',
+          done: 'Listed {count} article(s) in group "{groupName}"',
+          error: 'Failed to list articles in group "{groupName}"',
+        },
+        get_article_content: {
+          running: 'Reading "{title}"…',
+          done: 'Read "{title}" ({count} characters)',
+          doneWithPending: 'Read "{title}" (draft {count} chars, pending changes included)',
+          error: 'Failed to read "{title}"',
+        },
+        get_article_word_count: {
+          running: 'Counting words in "{title}"…',
+          done: 'Counted words in "{title}": {count} characters',
+          error: 'Failed to count words in "{title}"',
+        },
+        get_group_articles: {
+          running: 'Reading {count} article(s) in group "{groupName}"…',
+          done: 'Read {count} article(s) in group "{groupName}"',
+          error: 'Failed to read articles in group "{groupName}"',
+        },
+        update_article_content: {
+          running: 'Submitting changes for "{title}"…',
+          done: 'Submitted changes for "{title}", pending review',
+          error: 'Failed to submit changes for "{title}"',
+        },
+        create_article: {
+          running: 'Creating article "{title}"…',
+          done: 'Created article "{title}"',
+          error: 'Failed to create article "{title}"',
+        },
+      },
     },
     sync: {
       saved: 'Synced with cloud',

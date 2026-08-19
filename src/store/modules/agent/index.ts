@@ -189,5 +189,23 @@ export const useAgentStore = defineStore('agent-store', {
       Object.assign(step, patch)
       return true
     },
+
+    /** 指定 session 内 patch step（accept/reject 回写 tool 状态） */
+    patchStepInSession(
+      sessionId: number,
+      stepIndex: number,
+      patch: Partial<AgentStep.Step>,
+    ): boolean {
+      const session = findSessionById(this.sessions, sessionId)
+      if (!session)
+        return false
+
+      const step = session.steps[stepIndex]
+      if (!step || step.index !== stepIndex)
+        return false
+
+      Object.assign(step, patch)
+      return true
+    },
   },
 })

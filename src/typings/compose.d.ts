@@ -34,25 +34,29 @@ declare namespace Compose {
     loading: boolean
   }
 
-  /** LLM 工具调用返回的变更，用于副编辑器 diff 对比 */
-  interface TabChanges {
-    diff: unknown
+  /** Agent 待审改动（按 articleId 单槽存储，与页签开闭无关） */
+  interface ArticleChange {
     content: string
+    /** 推送该 changes 的 Agent tool step index */
+    sourceToolStepIndex?: number
+    /** 推送时所在的 Agent session id */
+    sourceSessionId?: number
   }
 
-  /** 页签视图层：draft / 同步状态 / LLM 变更 */
+  /** 页签视图层：draft / 同步状态 */
   interface Tab {
     linkedID: number
     title: string
     draft: string
     syncState: SyncState
     syncError: string | null
-    changes?: TabChanges
   }
 
   interface TabState {
     tabs: Record<number, Tab>
     openTabs: number[]
     activeArticleId: number | null
+    /** 全局待审改动：articleId → 单槽变更 */
+    articleChanges: Record<number, ArticleChange>
   }
 }

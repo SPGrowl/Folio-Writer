@@ -1,7 +1,10 @@
 import { t } from '@/locales'
 
 export function formatToolStepLine(step: AgentStep.ToolStep): string {
-  const target = step.msg?.trim() || t('compose.agent.toolDefaultTarget')
+  if (step.msg?.trim())
+    return step.msg.trim()
+
+  const target = t('compose.agent.toolDefaultTarget')
 
   if (step.status === 'running')
     return t('compose.agent.toolRunning', { target })

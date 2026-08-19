@@ -124,6 +124,26 @@ export const useComposeStore = defineStore('compose-store', {
       return data
     },
 
+    /** 重命名文章（优先使用已打开页签的 draft 作为正文） */
+    async renameArticle(id: number, title: string) {
+      const article = this.findArticle(id)
+      if (!article)
+        throw new Error('文章不存在')
+
+      const tabStore = useComposeTabStore()
+      const tab = tabStore.findTab(id)
+      const content = tab?.draft ?? article.content
+      const resolvedTitle = title.trim() || '未命名文章'
+
+      if (resolvedTitle === article.title && (!tab || resolvedTitle === tab.title))
+        return
+
+      if (tab)
+        await tabStore.saveTab(id, content, resolvedTitle)
+      else
+        await this.persistArticle(id, content, resolvedTitle)
+    },
+
     async removeGroup(id: string) {
       await apiDeleteArticleGroup(id)
       await this.bootstrap()

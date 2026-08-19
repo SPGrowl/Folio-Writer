@@ -1,6 +1,6 @@
 import { AGENT_TOOL_REGISTRY } from '@/agent/tool'
 import { t } from '@/locales'
-import { useAgentStore } from '@/store'
+import { useAgentStore, useComposeTabStore } from '@/store'
 import { safeParseToolArgs } from './parseToolArgs'
 
 function fallbackToolMsg(
@@ -18,6 +18,26 @@ function fallbackToolMsg(
   return toolName || t('compose.agent.toolDefaultTarget')
 }
 
+function fallbackRunningMsg(
+  toolName: string,
+  args: Record<string, unknown>,
+  ctx: AgentStep.InitialContext | null,
+): string {
+  return t('compose.agent.toolRunning', {
+    target: fallbackToolMsg(toolName, args, ctx),
+  })
+}
+
+function fallbackErrorMsg(
+  toolName: string,
+  args: Record<string, unknown>,
+  ctx: AgentStep.InitialContext | null,
+): string {
+  return t('compose.agent.toolError', {
+    target: fallbackToolMsg(toolName, args, ctx),
+  })
+}
+
 function resolveToolError(error: unknown): string {
   if (error instanceof Error)
     return error.message
@@ -30,20 +50,25 @@ export async function executeToolStepsFromAssistant(
   signal: AbortSignal,
 ) {
   const store = useAgentStore()
+  const tabStore = useComposeTabStore()
   const ctx = store.activeSession?.documentContext ?? null
+  const sessionId = store.activeSession?.id
 
   for (const tc of assistant.tool_calls ?? []) {
     if (signal.aborted)
       break
 
-    const entry = AGENT_TOOL_REGISTRY[tc.function.name]
+    const toolName = tc.function.name
+    const entry = AGENT_TOOL_REGISTRY[toolName]
     const args = safeParseToolArgs(tc.function.arguments)
-    const msg = entry?.msgFromArgs?.(args, ctx)
-      ?? fallbackToolMsg(tc.function.name, args, ctx)
+    const runningMsg = entry?.formatRunning(args, ctx)
+      ?? fallbackRunningMsg(toolName, args, ctx)
 
     const toolStep = store.pushToolStep(tc.id, '', {
       status: 'running',
-      msg,
+      msg: runningMsg,
+      toolName,
+      ...(toolName === 'update_article_content' ? { reviewStatus: 'pending' as const } : {}),
     })
     if (!toolStep)
       break
@@ -56,25 +81,38 @@ export async function executeToolStepsFromAssistant(
     if (!entry) {
       store.patchStepAt(toolStep.index, {
         status: 'error',
-        error: `未知工具：${tc.function.name}`,
-        msg,
+        error: `未知工具：${toolName}`,
+        msg: fallbackErrorMsg(toolName, args, ctx),
       })
       continue
     }
 
     try {
-      const { payload, msg: resultMsg } = entry.execute(args)
+      const result = await Promise.resolve(entry.execute(args))
+
+      if (toolName === 'update_article_content' && result.meta && sessionId != null) {
+        tabStore.applyAgentChanges(result.meta.articleId, result.meta.content, {
+          sourceToolStepIndex: toolStep.index,
+          sourceSessionId: sessionId,
+        })
+      }
+
       store.patchStepAt(toolStep.index, {
         status: 'done',
-        content: JSON.stringify(payload),
-        msg: resultMsg ?? msg,
+        content: JSON.stringify(result.payload),
+        msg: entry.formatDone(args, result),
+        ...(toolName === 'update_article_content'
+          ? { reviewStatus: 'pending' as const }
+          : {}),
       })
     }
     catch (error) {
+      const errorText = resolveToolError(error)
       store.patchStepAt(toolStep.index, {
         status: 'error',
-        error: resolveToolError(error),
-        msg,
+        error: errorText,
+        msg: entry.formatError?.(args, ctx, errorText)
+          ?? fallbackErrorMsg(toolName, args, ctx),
       })
     }
   }
