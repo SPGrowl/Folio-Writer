@@ -1,77 +1,18 @@
-import {
-  executeGetArticleContent,
-  formatDoneGetArticleContent,
-  formatErrorGetArticleContent,
-  formatRunningGetArticleContent,
-} from './getArticleContent'
-import {
-  executeGetArticleWordCount,
-  formatDoneGetArticleWordCount,
-  formatErrorGetArticleWordCount,
-  formatRunningGetArticleWordCount,
-} from './getArticleWordCount'
-import {
-  executeGetGroupArticles,
-  formatDoneGetGroupArticles,
-  formatErrorGetGroupArticles,
-  formatRunningGetGroupArticles,
-} from './getGroupArticles'
-import {
-  executeListGroupArticles,
-  formatDoneListGroupArticles,
-  formatErrorListGroupArticles,
-  formatRunningListGroupArticles,
-} from './listGroupArticles'
+import { executeGetArticleContent } from './getArticleContent'
+import { executeGetArticleWordCount } from './getArticleWordCount'
+import { executeGetGroupArticles } from './getGroupArticles'
+import { executeListGroupArticles } from './listGroupArticles'
+import { executeCreateArticleInGroup } from './createArticleInGroup'
+import { executeUpdateArticleContent } from './updateArticleContent'
+import { executePatchArticleContent } from './patchArticleContent'
 
-import {
-  executeCreateArticleInGroup,
-  formatDoneCreateArticleInGroup,
-  formatErrorCreateArticleInGroup,
-  formatRunningCreateArticleInGroup,
-} from './createArticleInGroup'
-import {
-  executeUpdateArticleContent,
-  formatDoneUpdateArticleContent,
-  formatErrorUpdateArticleContent,
-  formatRunningUpdateArticleContent,
-} from './updateArticleContent'
-
-/** 工具名 → 执行与展示文案（与 AGENT_TOOL_DEFINITIONS 保持同步） */
+/** 工具名 → 执行（与 AGENT_TOOL_DEFINITIONS 保持同步） */
 export const AGENT_TOOL_REGISTRY: Record<string, AgentStep.ToolRegistryEntry> = {
-  create_article: {
-    formatRunning: formatRunningCreateArticleInGroup,
-    formatDone: formatDoneCreateArticleInGroup,
-    formatError: formatErrorCreateArticleInGroup,
-    execute: executeCreateArticleInGroup,
-  },
-  update_article_content: {
-    formatRunning: formatRunningUpdateArticleContent,
-    formatDone: formatDoneUpdateArticleContent,
-    formatError: formatErrorUpdateArticleContent,
-    execute: executeUpdateArticleContent,
-  },
-  list_group_articles: {
-    formatRunning: formatRunningListGroupArticles,
-    formatDone: formatDoneListGroupArticles,
-    formatError: formatErrorListGroupArticles,
-    execute: executeListGroupArticles,
-  },
-  get_article_content: {
-    formatRunning: formatRunningGetArticleContent,
-    formatDone: formatDoneGetArticleContent,
-    formatError: formatErrorGetArticleContent,
-    execute: executeGetArticleContent,
-  },
-  get_article_word_count: {
-    formatRunning: formatRunningGetArticleWordCount,
-    formatDone: formatDoneGetArticleWordCount,
-    formatError: formatErrorGetArticleWordCount,
-    execute: executeGetArticleWordCount,
-  },
-  get_group_articles: {
-    formatRunning: formatRunningGetGroupArticles,
-    formatDone: formatDoneGetGroupArticles,
-    formatError: formatErrorGetGroupArticles,
-    execute: executeGetGroupArticles,
-  },
+  create_article: { execute: executeCreateArticleInGroup },
+  update_article_content: { execute: executeUpdateArticleContent },
+  patch_article_content: { execute: executePatchArticleContent },
+  list_group_articles: { execute: executeListGroupArticles },
+  get_article_content: { execute: executeGetArticleContent },
+  get_article_word_count: { execute: executeGetArticleWordCount },
+  get_group_articles: { execute: executeGetGroupArticles },
 }

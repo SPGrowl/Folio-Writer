@@ -76,6 +76,7 @@ export async function runTurn(signal: AbortSignal) {
       if (!finalized || finalized.role !== 'assistant')
         break
 
+      // 派生并执行工具调用
       await executeToolStepsFromAssistant(finalized, signal)
     }
   }

@@ -46,6 +46,7 @@ export async function streamOneTurn(
         if (!delta)
           return
 
+        // 
         acc.apply(delta)
         options.onPatch(acc.getDisplayPatch())
       },
@@ -64,6 +65,7 @@ export async function streamOneTurn(
     throw new Error(streamError)
 
   return {
+    // 完整assistant消息内容
     message: acc.finalize(),
     finishReason,
   }

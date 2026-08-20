@@ -87,14 +87,19 @@ function toggleCollapsed() {
 
 function handleNewChat() {
   agentStore.createSession(agentMode.value)
+  requestAnimationFrame(() => scrollToBottom())
 }
 
 function handleSelectTab(id: number) {
   agentStore.switchSession(id)
+  requestAnimationFrame(() => scrollToBottom())
 }
 
 function handleCloseTab(id: number) {
+  const wasActive = activeSessionId.value === id
   agentStore.closeSession(id)
+  if (wasActive)
+    requestAnimationFrame(() => scrollToBottom())
 }
 
 function handleSend() {
@@ -104,6 +109,7 @@ function handleSend() {
   const text = prompt.value.trim()
   prompt.value = ''
   sendAgentMessage(text)
+  requestAnimationFrame(() => scrollToBottom())
 }
 
 function handlePause() {
@@ -120,11 +126,28 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 const mainRef = ref<HTMLElement | null>(null)
+const NEAR_BOTTOM = 80
+
+function isNearBottom(el: HTMLElement, threshold = NEAR_BOTTOM) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
+}
+
+function scrollToBottom() {
+  const el = mainRef.value
+  if (!el)
+    return
+  el.scrollTop = el.scrollHeight
+}
+
+function stickToBottom() {
+  const el = mainRef.value
+  if (!el || !isNearBottom(el))
+    return
+  el.scrollTop = el.scrollHeight
+}
 
 watch(activeSteps, () => {
-  requestAnimationFrame(() => {
-    mainRef.value?.scrollTo({ top: mainRef.value.scrollHeight, behavior: 'smooth' })
-  })
+  requestAnimationFrame(stickToBottom)
 }, { deep: true })
 
 let resizeStartX = 0

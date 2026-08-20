@@ -1,4 +1,5 @@
 import { useAgentStore } from '@/store'
+import { isArticleWriteTool } from '@/agent/tool/articleWrite'
 
 export type ToolReviewStatus = 'pending' | 'accepted' | 'rejected' | 'superseded'
 
@@ -59,7 +60,7 @@ export function patchToolStepReviewStatus(
   if (!step || step.role !== 'tool' || step.index !== stepIndex)
     return false
 
-  if (step.toolName !== 'update_article_content')
+  if (!isArticleWriteTool(step.toolName ?? ''))
     return false
 
   return agentStore.patchStepInSession(sessionId, stepIndex, {

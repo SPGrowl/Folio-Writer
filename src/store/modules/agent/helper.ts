@@ -65,6 +65,12 @@ export function createAssistantStep(
   }
 }
 
+const EMPTY_TOOL_MSG: Record<AgentStep.ToolStatus, string> = {
+  running: '',
+  done: '',
+  error: '',
+}
+
 export function createToolStep(
   index: number,
   toolCallId: string,
@@ -77,6 +83,7 @@ export function createToolStep(
     tool_call_id: toolCallId,
     content,
     status: 'running',
+    msg: { ...EMPTY_TOOL_MSG },
     ...partial,
   }
 }

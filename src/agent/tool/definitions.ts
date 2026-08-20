@@ -4,7 +4,7 @@ export const AGENT_TOOL_DEFINITIONS: AgentApi.ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'create_article',
-      description: '在指定分组下按标题新建一篇文章。返回 articleId 等信息。初始正文为占位 Markdown；若需写入完整内容，请再调用 update_article_content（进入 articleChanges 待审，不直接改 draft）。',
+      description: '在指定分组下按标题新建一篇文章。返回 articleId 等信息。初始正文为占位 Markdown。首次写入完整正文可用 update_article_content；之后局部修改请用 patch_article_content。内容进入 articleChanges 待审，不直接改 draft。',
       parameters: {
         type: 'object',
         properties: {
@@ -25,7 +25,7 @@ export const AGENT_TOOL_DEFINITIONS: AgentApi.ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'update_article_content',
-      description: '提交某篇文章的全文修改建议。写入 articleChanges（单槽），不直接改 draft；用户在编辑器 diff 区采纳后才生效。成功后勿重复调用；可 get_article_content 查看 proposed。改稿前先 get_article_content 阅读 draft。',
+      description: '不推荐。仅用于整篇重写、结构大改，或新建后首次灌入完整 Markdown。日常局部修改请用 patch_article_content。写入 articleChanges（单槽），不直接改 draft。调用前必须先 get_article_content。',
       parameters: {
         type: 'object',
         properties: {
@@ -43,6 +43,55 @@ export const AGENT_TOOL_DEFINITIONS: AgentApi.ToolDefinition[] = [
           },
         },
         required: ['article_id', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'patch_article_content',
+      description: [
+        '推荐的写稿工具。对某篇文章做局部修改，不要在参数里返回全文。',
+        'edits 为 {oldText, newText}[]：本地按顺序对当前正文做精确字符串替换，拼成完整 proposed 后写入待审槽，不直接改 draft。',
+        '每次调用前必须先 get_article_content。若返回含 proposed，oldText 必须从 proposed 原样复制；否则从 draft 复制。禁止凭记忆编写 oldText。',
+        'oldText 至少一整句，优先一整段，且必须在当前正文中恰好出现一次。',
+        '替换：oldText=原句/段，newText=新句/段。',
+        '删除：oldText=要删的句/段（可带前后一句作锚点），newText 为空字符串。',
+        '插入：oldText=锚点那一句/段，newText=「锚点+新内容」或「新内容+锚点」。禁止 oldText 为空。',
+        '成功后该 tool step 的 reviewStatus 为 pending，draft 不变；勿因 draft 未变而重提。用户采纳/拒绝后变为 accepted/rejected。',
+        '仅在整篇重写或新建后第一次灌入全文时，才使用 update_article_content。',
+      ].join(''),
+      parameters: {
+        type: 'object',
+        properties: {
+          article_id: {
+            type: 'number',
+            description: '文章 ID，通常为当前绑定文档的 articleId',
+          },
+          edits: {
+            type: 'array',
+            description: '按顺序应用的替换列表。每条 oldText 必须从刚读取的正文原样复制。单次最多 8 条。',
+            items: {
+              type: 'object',
+              properties: {
+                oldText: {
+                  type: 'string',
+                  description: '要被替换的原文片段（整句或整段，须唯一）。插入或删除时作为锚点，不能为空。',
+                },
+                newText: {
+                  type: 'string',
+                  description: '替换结果。空字符串表示删除 oldText。',
+                },
+              },
+              required: ['oldText', 'newText'],
+            },
+          },
+          summary: {
+            type: 'string',
+            description: '本次修改的 1～2 句概述，写入 tool 回执供后续对话引用',
+          },
+        },
+        required: ['article_id', 'edits'],
       },
     },
   },
@@ -67,7 +116,7 @@ export const AGENT_TOOL_DEFINITIONS: AgentApi.ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'get_article_content',
-      description: '根据文章 ID 返回 Markdown 标题与正文。返回 draft（当前编辑器正文）；若存在待审改动，同时返回 pending（已推送的修改稿）及说明。改稿前必读；update_article_content 成功后可用本工具核对 pending。',
+      description: '根据文章 ID 返回 Markdown 标题与正文。返回 draft（当前编辑器正文）；若存在待审改动，同时返回 proposed（已推送的修改稿）及说明。每次改稿前必须先调用本工具。有 proposed 时，后续 patch_article_content 的 oldText 必须从 proposed 复制。',
       parameters: {
         type: 'object',
         properties: {

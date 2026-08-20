@@ -1,32 +1,6 @@
 import { useComposeStore } from '@/store'
-import { t } from '@/locales'
 import { readArticleSnapshot } from './articleSource'
-import { resolveGroupId, resolveGroupMeta } from './groupSource'
-
-export function formatRunningGetGroupArticles(
-  args: Record<string, unknown>,
-  ctx: AgentStep.InitialContext | null,
-): string {
-  const { groupName, count } = resolveGroupMeta(args, ctx)
-  return t('compose.agent.tools.get_group_articles.running', { groupName, count })
-}
-
-export function formatDoneGetGroupArticles(
-  _args: Record<string, unknown>,
-  result: AgentStep.ToolExecuteResult,
-): string {
-  const groupName = String(result.payload.groupName ?? t('compose.agent.toolDefaultTarget'))
-  const count = Number(result.payload.count ?? 0)
-  return t('compose.agent.tools.get_group_articles.done', { groupName, count })
-}
-
-export function formatErrorGetGroupArticles(
-  args: Record<string, unknown>,
-  ctx: AgentStep.InitialContext | null,
-): string {
-  const { groupName } = resolveGroupMeta(args, ctx)
-  return t('compose.agent.tools.get_group_articles.error', { groupName })
-}
+import { resolveGroupId } from './groupSource'
 
 /** 根据分组 ID 返回整组文章的 ID、标题与正文（优先使用已打开页签的 draft） */
 export function executeGetGroupArticles(

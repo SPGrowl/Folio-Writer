@@ -1,18 +1,5 @@
-import { t } from '@/locales'
-
 export function formatToolStepLine(step: AgentStep.ToolStep): string {
-  if (step.msg?.trim())
-    return step.msg.trim()
-
-  const target = t('compose.agent.toolDefaultTarget')
-
-  if (step.status === 'running')
-    return t('compose.agent.toolRunning', { target })
-
-  if (step.status === 'error')
-    return t('compose.agent.toolError', { target })
-
-  return t('compose.agent.toolDone', { target })
+  return step.msg[step.status]?.trim() || '文档'
 }
 
 export function isAssistantLoading(step: AgentStep.AssistantStep): boolean {

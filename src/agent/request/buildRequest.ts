@@ -26,6 +26,11 @@ function stepToApiMessage(step: AgentStep.Step): AgentApi.Message {
   }
 }
 
+/** 流式占位尚未成为模型输出，编进 messages 会在 thinking 模式下触发 reasoning_content 400 */
+function isReadyForRequest(step: AgentStep.Step): boolean {
+  return step.role !== 'assistant' || step.status !== 'streaming'
+}
+
 /**
  * 请求层唯一出口：按 mode 贴 system，将 store 已准备好的 steps 转为 messages。
  * 线性 / 回溯 / index 校正由 store 在调用前完成。
@@ -38,7 +43,7 @@ export function buildRequest(session: AgentStep.Session): AgentApi.CompletionReq
     model: settingStore.modelName,
     messages: [
       { role: 'system', content: buildSystemPrompt(session) },
-      ...session.steps.map(stepToApiMessage),
+      ...session.steps.filter(isReadyForRequest).map(stepToApiMessage),
     ],
     documentContext: session.documentContext
       ? {

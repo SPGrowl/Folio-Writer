@@ -61,10 +61,10 @@ declare namespace AgentStep {
     status: ToolStatus
     /** 对应 OpenAI tool function name，用于展示文案回溯 */
     toolName?: string
-    /** 写工具审阅状态（update_article_content） */
+    /** 写工具审阅状态（patch_article_content / update_article_content） */
     reviewStatus?: ToolReviewStatus
-    /** 当前状态下的完整展示文案（running / done / error） */
-    msg?: string
+    /** 与 status 同键的展示槽；模板读 msg[status] */
+    msg: Record<ToolStatus, string>
     error?: string
   }
 
@@ -114,9 +114,6 @@ declare namespace AgentStep {
   }
 
   interface ToolRegistryEntry {
-    formatRunning: (args: Record<string, unknown>, ctx: InitialContext | null) => string
-    formatDone: (args: Record<string, unknown>, result: ToolExecuteResult) => string
-    formatError?: (args: Record<string, unknown>, ctx: InitialContext | null, error: string) => string
     execute: (args: Record<string, unknown>) => ToolExecuteResult | Promise<ToolExecuteResult>
   }
 

@@ -1,33 +1,8 @@
 import { useComposeStore } from '@/store'
-import { t } from '@/locales'
 import { resolveGroupId } from './groupSource'
 
 const CREATE_WRITE_HINT
-  = '文章已创建。写入或修改正文请使用 update_article_content(article_id, content)；内容将进入 changes 待用户审阅，不会直接覆盖 draft。'
-
-export function formatRunningCreateArticleInGroup(
-  args: Record<string, unknown>,
-  _ctx: AgentStep.InitialContext | null,
-): string {
-  const title = typeof args.title === 'string' ? args.title.trim() : t('compose.untitled')
-  return t('compose.agent.tools.create_article.running', { title })
-}
-
-export function formatDoneCreateArticleInGroup(
-  _args: Record<string, unknown>,
-  result: AgentStep.ToolExecuteResult,
-): string {
-  const title = String(result.payload.title ?? t('compose.untitled'))
-  return t('compose.agent.tools.create_article.done', { title })
-}
-
-export function formatErrorCreateArticleInGroup(
-  args: Record<string, unknown>,
-  _ctx: AgentStep.InitialContext | null,
-): string {
-  const title = typeof args.title === 'string' ? args.title.trim() : t('compose.untitled')
-  return t('compose.agent.tools.create_article.error', { title })
-}
+  = '文章已创建。首次写入完整正文可用 update_article_content；之后局部修改请用 patch_article_content。内容进入 articleChanges 待用户审阅，不会直接覆盖 draft。每次改稿前先 get_article_content。'
 
 function resolveTitle(args: Record<string, unknown>): string {
   const raw = args.title

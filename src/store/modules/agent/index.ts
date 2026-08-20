@@ -176,6 +176,20 @@ export const useAgentStore = defineStore('agent-store', {
       return step
     },
 
+    /** 合并改写 tool 展示槽，避免 Object.assign 整键替换冲掉另外两句 */
+    patchToolMsgSlot(stepIndex: number, slot: AgentStep.ToolStatus, text: string): boolean {
+      const session = this.activeSession
+      if (!session)
+        return false
+
+      const step = session.steps[stepIndex]
+      if (!step || step.role !== 'tool' || step.index !== stepIndex)
+        return false
+
+      step.msg = { ...step.msg, [slot]: text }
+      return true
+    },
+
     /** 按 index 局部更新 step（流式 patch 等） */
     patchStepAt(stepIndex: number, patch: Partial<AgentStep.Step>): boolean {
       const session = this.activeSession
