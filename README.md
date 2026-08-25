@@ -1,4 +1,4 @@
-# GPT-Web Lite
+# Folio Writer
 
 > **叠甲声明（求路过的大佬轻喷）**
 >
@@ -103,7 +103,7 @@ Agent 模式里的工具（前端执行）：
 ## 目录结构
 
 ```
-chatgpt-web/
+folio-writer/
 ├── docs/                          # 开发日志、设计备忘
 ├── src/
 │   ├── agent/                     # Agent：请求、子循环、工具、审阅回写
@@ -169,7 +169,7 @@ cd service && pnpm dev
 pnpm dev
 ```
 
-前端默认把 `/api` 代理到后端。浏览器打开 Vite 给出的本地地址即可。
+前端默认把 `/api` 代理到后端。浏览器打开 Vite 给出的本地地址即可。本仓库只维护前后端独立启动与手动打包，不提供 Docker / Kubernetes / Railway 等部署方式。
 
 ---
 
@@ -184,7 +184,7 @@ pnpm dev
 - **不支持多 Agent 会话并发。** 切页签会 abort 当前任务。对话侧同样是单飞。
 - **服务端基本是个管道。** `mode` / `documentContext` 还没参与 prompt 编排，工具也不在服务端跑，没法做鉴权到「哪篇文章能改」。
 - 目录里仍有 `toolStub`、注释掉的旧 chatgpt 协议、以及 `service/src/oepnai` 这种历史拼写。
-- 原版那套 Docker / Railway 文档还在 [README.zh.md](./README.zh.md)，和现在这条主路径未必对齐。
+- 上游原版说明见 [README.zh.md](./README.zh.md)，其中部分接口与产品描述可能落后于本仓库。
 
 ### 产品 / UX
 

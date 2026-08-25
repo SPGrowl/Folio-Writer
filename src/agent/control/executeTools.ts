@@ -25,8 +25,10 @@ export async function executeToolStepsFromAssistant(
 
     const toolName = tc.function.name
     const entry = AGENT_TOOL_REGISTRY[toolName]
+    // 解析工具参数
     const args = safeParseToolArgs(tc.function.arguments)
 
+    // 更新工具step，并拿到引用
     const toolStep = store.pushToolStep(tc.id, '', {
       status: 'running',
       msg: buildToolMsg(toolName, args, ctx),
@@ -59,6 +61,7 @@ export async function executeToolStepsFromAssistant(
         })
       }
 
+      // 更新工具step的展示
       store.patchToolMsgSlot(
         toolStep.index,
         'done',

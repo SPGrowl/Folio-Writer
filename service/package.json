@@ -1,11 +1,11 @@
 {
-  "name": "chatgpt-web-service",
+  "name": "folio-writer-service",
   "version": "1.0.0",
   "private": false,
-  "description": "ChatGPT Web Service",
+  "description": "Folio Writer Service",
   "author": "ChenZhaoYu <chenzhaoyu1994@gmail.com>",
   "keywords": [
-    "chatgpt-web",
+    "folio-writer",
     "chatgpt",
     "chatbot",
     "express"
