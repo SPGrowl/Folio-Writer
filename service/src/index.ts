@@ -6,6 +6,7 @@ import express from 'express'
 import { testConnection } from './db/pool'
 import { testPrismaConnection } from './db/prisma'
 import { ensureDefaultArticleGroup } from './db/articleGroups'
+import { ensureVectorStore, isEmbeddingConfigured } from './db/vector'
 import { auth } from './middleware/auth'
 import { limiter } from './middleware/limiter'
 import { registerArticleRoutes } from './routes/articles'
@@ -123,5 +124,18 @@ app.listen(3002, async () => {
   }
   catch (error: any) {
     globalThis.console.warn(`PostgreSQL unavailable: ${error.message}`)
+    return
+  }
+
+  try {
+    await ensureVectorStore()
+    globalThis.console.log(
+      isEmbeddingConfigured()
+        ? 'pgvector ready (article_chunks); embedding configured'
+        : 'pgvector ready (article_chunks); embedding NOT configured — indexing will be skipped',
+    )
+  }
+  catch (error: any) {
+    globalThis.console.warn(`pgvector unavailable: ${error.message}`)
   }
 })

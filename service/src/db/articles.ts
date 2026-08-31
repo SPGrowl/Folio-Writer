@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { addArticleToGroup, removeArticleFromGroup } from './articleGroups'
+import { scheduleReindexArticle } from './vector'
 
 /** 单条版本历史（类似 git commit） */
 export interface ArticleHistoryDto {
@@ -184,6 +185,13 @@ export async function createArticle(input: CreateArticleInput): Promise<ArticleD
     return created
   })
 
+  scheduleReindexArticle({
+    articleId: Number(article.id),
+    title: article.title,
+    content: article.content,
+    groupId: article.linkedGroup,
+  })
+
   return toArticleDto(article)
 }
 
@@ -204,6 +212,13 @@ export async function updateArticle(input: UpdateArticleInput): Promise<ArticleD
     include: {
       history: { orderBy: historyOrder },
     },
+  })
+
+  scheduleReindexArticle({
+    articleId: Number(updated.id),
+    title: updated.title,
+    content: updated.content,
+    groupId: updated.linkedGroup,
   })
 
   return toArticleDto(updated)
