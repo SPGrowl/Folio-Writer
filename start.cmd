@@ -1,9 +1,8 @@
-cd ./service
-start pnpm start > service.log &
-echo "Start service complete!"
+@echo off
+cd /d "%~dp0"
 
+start "folio-service" cmd /k "cd /d "%~dp0service" && pnpm dev"
+start "folio-web" cmd /k "cd /d "%~dp0" && pnpm dev"
 
-cd ..
-echo "" > front.log
-start pnpm dev > front.log &
-echo "Start front complete!"
+echo 已分别打开后端与前端窗口。
+pause

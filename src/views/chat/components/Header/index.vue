@@ -1,26 +1,19 @@
 <script lang="ts" setup>
 import { computed, nextTick } from 'vue'
 import { HoverButton, SvgIcon } from '@/components/common'
-import { useAppStore, useChatStore } from '@/store'
-
-interface Props {
-  usingContext: boolean
-}
+import { useAppStore, useSessionStore } from '@/store'
 
 interface Emit {
   (ev: 'export'): void
-  (ev: 'handleClear'): void
 }
-
-defineProps<Props>()
 
 const emit = defineEmits<Emit>()
 
 const appStore = useAppStore()
-const chatStore = useChatStore()
+const sessionStore = useSessionStore()
 
 const collapsed = computed(() => appStore.siderCollapsed)
-const currentChatHistory = computed(() => chatStore.getChatHistoryByCurrentActive)
+const currentTitle = computed(() => sessionStore.getActiveSession?.title ?? '')
 
 function handleUpdateCollapsed() {
   appStore.setSiderCollapsed(!collapsed.value)
@@ -34,10 +27,6 @@ function onScrollToTop() {
 
 function handleExport() {
   emit('export')
-}
-
-function handleClear() {
-  emit('handleClear')
 }
 </script>
 
@@ -59,17 +48,12 @@ function handleClear() {
         class="flex-1 px-4 pr-6 overflow-hidden cursor-pointer select-none text-ellipsis whitespace-nowrap"
         @dblclick="onScrollToTop"
       >
-        {{ currentChatHistory?.title ?? '' }}
+        {{ currentTitle }}
       </h1>
       <div class="flex items-center space-x-2">
         <HoverButton @click="handleExport">
           <span class="text-xl text-[#4f555e] dark:text-white">
             <SvgIcon icon="ri:download-2-line" />
-          </span>
-        </HoverButton>
-        <HoverButton @click="handleClear">
-          <span class="text-xl text-[#4f555e] dark:text-white">
-            <SvgIcon icon="ri:delete-bin-line" />
           </span>
         </HoverButton>
       </div>

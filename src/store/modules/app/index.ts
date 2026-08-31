@@ -32,14 +32,12 @@ export const useAppStore = defineStore('app-store', {
     },
 
     setLanguage(language: Language) {
+      if (language !== 'zh-CN')
+        return
       if (this.language !== language) {
         this.language = language
         this.recordState()
-				console.log(this.liteMode)
       }
-    },
-    setLiteMode() {
-      this.recordState()
     },
     recordState() {
       setLocalSetting(this.$state)

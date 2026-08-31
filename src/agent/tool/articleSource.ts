@@ -1,5 +1,4 @@
 import { useComposeStore, useComposeTabStore } from '@/store'
-import { t } from '@/locales'
 import { countMarkdownChars } from './countMarkdownChars'
 
 export function resolveArticleId(args: Record<string, unknown>): number {
@@ -88,5 +87,5 @@ export function resolveArticleTitle(
       return ctx.title
   }
 
-  return t('compose.untitled')
+  return '未命名文章'
 }

@@ -1,5 +1,3 @@
-import { t } from '@/locales'
-
 let sessionIdSeq = Date.now()
 
 export function allocateSessionId(): number {
@@ -18,7 +16,7 @@ export function defaultState(): AgentStep.State {
 export function createEmptySession(mode: AgentStep.Mode = 'agent'): AgentStep.Session {
   return {
     id: allocateSessionId(),
-    title: t('compose.agent.newTabTitle', { n: 1 }),
+    title: '对话 1',
     mode,
     documentContext: null,
     steps: [],

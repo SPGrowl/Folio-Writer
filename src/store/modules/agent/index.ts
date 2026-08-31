@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { abortCurrentTask } from '@/agent/control/abort'
-import { t } from '@/locales'
 import {
   createAssistantStep,
   createEmptySession,
@@ -46,7 +45,7 @@ export const useAgentStore = defineStore('agent-store', {
     createSession(mode: AgentStep.Mode = 'agent') {
       this.abortRunning()
       const session = createEmptySession(mode)
-      session.title = t('compose.agent.newTabTitle', { n: this.sessions.length + 1 })
+      session.title = `对话 ${this.sessions.length + 1}`
       this.sessions.push(session)
       this.activeSessionId = session.id
       return session.id

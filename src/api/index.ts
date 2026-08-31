@@ -16,10 +16,6 @@ import { useSettingStore } from '@/store'
 //   })
 // }
 
-export function fetchChatConfig<T = any>() {
-  return post<T>('/config')
-}
-
 // export function fetchChatAPIProcess<T = any>(
 //   params: {
 //     prompt: string

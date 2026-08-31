@@ -1,21 +1,19 @@
 <script setup lang='ts'>
 import { ref } from 'vue'
 import { NButton, NInput, NPopconfirm, NScrollbar } from 'naive-ui'
-import { PromptStore, SvgIcon } from '@/components/common'
-import { useAppStore, useChatStore, useSessionStore } from '@/store'
+import { SvgIcon } from '@/components/common'
+import { useAppStore, useSessionStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { debounce } from '@/utils/functions/debounce'
 
 const { isMobile } = useBasicLayout()
 
 const appStore = useAppStore()
-const chatStore = useChatStore()
 const sessionStore = useSessionStore()
 const editingUuid = ref<number | null>(null)
-const showPromptStore = ref(false)
 
 async function handleAdd() {
-  await chatStore.goHome()
+  await sessionStore.goHome()
   if (isMobile.value)
     appStore.setSiderCollapsed(true)
 }
@@ -125,11 +123,5 @@ function isEditing(uuid: number) {
         </div>
       </NScrollbar>
     </div>
-    <div v-if="!appStore.liteMode" class="p-4">
-      <NButton block @click="showPromptStore = true">
-        {{ $t('store.siderButton') }}
-      </NButton>
-    </div>
-    <PromptStore v-model:visible="showPromptStore" />
   </div>
 </template>

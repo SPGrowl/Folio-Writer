@@ -260,6 +260,12 @@ export const useSessionStore = defineStore('session-store', {
       this.recordState()
     },
 
+    async goHome() {
+      this.activeUuid = null
+      this.recordState()
+      await router.push({ name: 'Home' })
+    },
+
     async reloadRoute(uuid?: number) {
       this.recordState()
       if (uuid)

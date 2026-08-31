@@ -1,0 +1,15 @@
+---
+description: Agent 模块禁止使用 i18n；用户可见文案直接写中文。
+globs: src/agent/**/*,src/store/modules/agent/**/*
+alwaysApply: false
+---
+
+# Agent 开发不使用 i18n
+
+在 `src/agent/**` 与 `src/store/modules/agent/**` 中：
+
+- **禁止** `import { t } from '@/locales'`、`$t(...)`、vue-i18n
+- 用户可见文案（错误信息、工具展示、会话标题等）**直接写简体中文**
+- 可参考 `src/agent/tool/display.ts`：文案常量就地定义
+
+UI 层（如 `views/chat/compose/AgentSidebar`）仍可暂用现有 `$t`；新增 Agent **核心逻辑**不要再引入 i18n。

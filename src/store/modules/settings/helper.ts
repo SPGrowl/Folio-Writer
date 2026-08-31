@@ -23,8 +23,7 @@ export function getLocalState(): SettingsState {
   const localSetting = ss.get(LOCAL_NAME)
   if (!localSetting)
     return defaultSetting()
-  const { liteMode: _legacyLite, ...rest } = localSetting
-  return { ...defaultSetting(), ...rest }
+  return { ...defaultSetting(), ...localSetting }
 }
 
 export function setLocalState(setting: SettingsState): void {

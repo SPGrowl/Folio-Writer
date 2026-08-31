@@ -2,42 +2,24 @@
 import type { Ref } from 'vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import Bubble from '@/views/chat/components/Bubble/index.vue'
 import {
-  NAutoComplete,
   NButton,
   NInput,
-  NTooltip,
   useDialog,
   useMessage,
   NDropdown,
   DropdownOption,
 } from 'naive-ui'
-import { useSessionStore, useSettingStore, usePromptStore } from '@/store'
+import { useSessionStore, useSettingStore } from '@/store'
 import { toPng } from 'html-to-image'
 import { useScroll } from './hooks/useScroll'
-import { useUsingContext } from './hooks/useUsingContext'
 import HeaderComponent from './components/Header/index.vue'
 import { HoverButton, SvgIcon } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { submitRequestBody } from '@/api'
 import { t } from '@/locales'
 import { useIconRender } from '@/hooks/useIconRender'
-
-// ========== 旧版 chatStore 相关，已废弃 ==========
-// import { Message } from './components'
-// import { useChat } from './hooks/useChat'
-// import { useChatStore } from '@/store'
-// import { fetchChatAPIProcess } from '@/api'
-// const chatStore = useChatStore()
-// const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
-// const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
-// const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
-// dataSources.value.forEach((item, index) => {
-//   if (item.loading)
-//     updateChatSome(+uuid, index, { loading: false })
-// })
 
 const { iconRender } = useIconRender()
 let controller = new AbortController()
@@ -49,7 +31,6 @@ const ms = useMessage()
 const sessionStore = useSessionStore()
 const { isMobile } = useBasicLayout()
 const { scrollRef, scrollToBottom, scrollToBottomIfAtBottom } = useScroll()
-const { usingContext, toggleUsingContext } = useUsingContext()
 
 const { uuid } = route.params as { uuid: string }
 
@@ -63,9 +44,7 @@ const sessionSource = computed(() => {
 const prompt = ref<string>('')
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
-const promptStore = usePromptStore()
 const settingStore = useSettingStore()
-const { promptList: promptTemplate } = storeToRefs<any>(promptStore)
 
 const modelList: DropdownOption[] = [
   {
@@ -186,12 +165,6 @@ function handleExport() {
   })
 }
 
-function handleDelete(index: number) {
-}
-
-function handleClear() {
-}
-
 function handleEnter(event: KeyboardEvent) {
   if (!isMobile.value) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -217,28 +190,6 @@ function handleStop() {
 function handleModelName(key: string) {
   settingStore.updateSetting({ modelName: key })
   ms.success(`${t('model.modelAlert')}${settingStore.modelName}`)
-}
-
-const searchOptions = computed(() => {
-  if (prompt.value.startsWith('/')) {
-    return promptTemplate.value.filter((item: { key: string }) => item.key.toLowerCase().includes(prompt.value.substring(1).toLowerCase())).map((obj: { value: any }) => {
-      return {
-        label: obj.value,
-        value: obj.value,
-      }
-    })
-  }
-  else {
-    return []
-  }
-})
-
-const renderOption = (option: { label: string }) => {
-  for (const i of promptTemplate.value) {
-    if (i.value === option.label)
-      return [i.key]
-  }
-  return []
 }
 
 const placeholder = computed(() => {
@@ -285,9 +236,7 @@ onUnmounted(() => {
   <div class="flex flex-col w-full h-full">
     <HeaderComponent
       v-if="isMobile"
-      :using-context="usingContext"
       @export="handleExport"
-      @handle-clear="handleClear"
     />
     <main class="flex-1 overflow-hidden">
       <div id="scrollRef" ref="scrollRef" class="h-full overflow-hidden overflow-y-auto">
@@ -316,21 +265,11 @@ onUnmounted(() => {
     <footer :class="footerClass">
       <div class="w-full max-w-screen-xl m-auto">
         <div class="flex items-center justify-between space-x-2">
-          <!-- <HoverButton v-if="!isMobile" @click="handleDelete(sessionSource?.uuid as number)">
-            <span class="text-xl text-[#4f555e] dark:text-white">
-              <SvgIcon icon="ri:delete-bin-line" />
-            </span>
-          </HoverButton> -->
           <HoverButton v-if="!isMobile" @click="handleExport">
             <span class="text-xl text-[#4f555e] dark:text-white">
               <SvgIcon icon="ri:download-2-line" />
             </span>
           </HoverButton>
-          <!-- <HoverButton @click="toggleUsingContext">
-            <span class="text-xl" :class="{ 'text-[#4b9e5f]': usingContext, 'text-[#a8071a]': !usingContext }">
-              <SvgIcon icon="ri:chat-history-line" />
-            </span>
-          </HoverButton> -->
           <n-dropdown
             trigger="hover"
             placement="top-start"
@@ -346,21 +285,14 @@ onUnmounted(() => {
             </HoverButton>
           </n-dropdown>
 
-          <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption">
-            <template #default="{ handleInput, handleBlur, handleFocus }">
-              <NInput
-                ref="inputRef"
-                v-model:value="prompt"
-                type="textarea"
-                :placeholder="placeholder"
-                :autosize="{ minRows: 1, maxRows: isMobile ? 4 : 8 }"
-                @input="handleInput"
-                @focus="handleFocus"
-                @blur="handleBlur"
-                @keypress="handleEnter"
-              />
-            </template>
-          </NAutoComplete>
+          <NInput
+            ref="inputRef"
+            v-model:value="prompt"
+            type="textarea"
+            :placeholder="placeholder"
+            :autosize="{ minRows: 1, maxRows: isMobile ? 4 : 8 }"
+            @keypress="handleEnter"
+          />
           <NButton v-if="!loading" type="primary" :disabled="buttonDisabled" @click="handleAppend">
             <template #icon>
               <span class="dark:text-black">

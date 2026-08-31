@@ -5,21 +5,21 @@ import { useRoute, useRouter } from 'vue-router'
 import Sider from './sider/index.vue'
 import Permission from './Permission.vue'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
-import { useAppStore, useAuthStore, useChatStore } from '@/store'
+import { useAppStore, useAuthStore, useSessionStore } from '@/store'
 import ComposePlaceholder from '@/views/chat/compose/index.vue'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
-const chatStore = useChatStore()
+const sessionStore = useSessionStore()
 const authStore = useAuthStore()
 
 function syncActiveRoute() {
   if (route.name === 'Home')
     return
 
-  if (chatStore.active)
-    router.replace({ name: 'Chat', params: { uuid: String(chatStore.active) } })
+  if (sessionStore.active)
+    router.replace({ name: 'Chat', params: { uuid: String(sessionStore.active) } })
 }
 
 watch(

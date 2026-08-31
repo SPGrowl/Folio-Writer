@@ -1,5 +1,4 @@
 import { useComposeStore } from '@/store'
-import { t } from '@/locales'
 
 export function resolveGroupId(args: Record<string, unknown>): string {
   const raw = args.group_id ?? args.groupId
@@ -19,7 +18,7 @@ export function resolveGroupMeta(
   if (!groupId) {
     return {
       groupId: ctx?.groupId ?? '',
-      groupName: ctx?.groupName || t('compose.agent.toolDefaultTarget'),
+      groupName: ctx?.groupName || '文档',
       count: 0,
     }
   }
